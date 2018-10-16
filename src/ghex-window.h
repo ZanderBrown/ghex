@@ -47,10 +47,10 @@ struct _GHexWindow
     GtkApplicationWindow win;
 
     GtkHex    *gh;
-    GtkWidget *header;
     GtkWidget *vbox;
     GtkWidget *contents;
     GtkWidget *statusbar;
+    GtkWidget *statusbar_insert_mode;
     guint      statusbar_tooltip_id;
 
     GtkActionGroup *action_group;

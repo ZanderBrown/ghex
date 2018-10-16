@@ -51,6 +51,7 @@ const char * const paste_accels[] = { "<primary>v", NULL };
 const char * const find_accels[] = { "<primary>f", NULL };
 const char * const replace_accels[] = { "<primary>h", NULL };
 const char * const jump_accels[] = { "<primary>j", NULL };
+const char * const insert_accels[] = { "Insert", NULL };
 const char * const help_accels[] = { "F1", NULL };
 const char * const quit_accels[] = { "<primary>q", NULL };
 const char * const close_accels[] = { "<primary>w", NULL };
@@ -146,6 +147,7 @@ main(int argc, char **argv)
 	gtk_application_set_accels_for_action (application, "win.cut", cut_accels);
 	gtk_application_set_accels_for_action (application, "win.copy", copy_accels);
 	gtk_application_set_accels_for_action (application, "win.paste", paste_accels);
+	gtk_application_set_accels_for_action (application, "win.insert", insert_accels);
 
 	gtk_application_set_accels_for_action (application, "win.find", find_accels);
 	gtk_application_set_accels_for_action (application, "win.replace", replace_accels);

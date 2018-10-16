@@ -66,7 +66,7 @@ void find_cb (GSimpleAction *action, GVariant *value, GHexWindow *window);
 void advanced_find_cb (GSimpleAction *action, GVariant *value, GHexWindow *window);
 void replace_cb (GSimpleAction *action, GVariant *value, GHexWindow *window);
 void jump_cb (GSimpleAction *action, GVariant *value, GHexWindow *window);
-void insert_mode_cb (GtkAction *action, gpointer user_data);
+void insert_mode_cb (GSimpleAction *action, GVariant *value, GHexWindow *window);
 void prefs_cb (GSimpleAction *action, GVariant *value, GHexWindow *window);
 
 /* View menu */

@@ -1,8 +1,5 @@
 <ui>
   <menubar name="MainMenu">
-    <menu action="Edit">
-      <menuitem action="EditInsertMode"/>
-    </menu>
     <menu action="View">
       <menuitem action="ViewAddView"/>
       <menuitem action="ViewRemoveView"/>

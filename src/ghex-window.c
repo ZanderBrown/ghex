@@ -252,7 +252,9 @@ ghex_window_set_sensitivity (GHexWindow *win)
     g_simple_action_set_enabled (G_SIMPLE_ACTION (act), allmenus);
     act = g_action_map_lookup_action (G_ACTION_MAP (win), "goto");
     g_simple_action_set_enabled (G_SIMPLE_ACTION (act), allmenus);
-    ghex_window_set_action_sensitive (win, "EditInsertMode", allmenus);
+    act = g_action_map_lookup_action (G_ACTION_MAP (win), "insert");
+    g_simple_action_set_enabled (G_SIMPLE_ACTION (act), allmenus);
+    gtk_widget_set_visible (win->statusbar_insert_mode, allmenus);
     act = g_action_map_lookup_action (G_ACTION_MAP (win), "undo");
     g_simple_action_set_enabled (G_SIMPLE_ACTION (act), allmenus && win->undo_sens);
     act = g_action_map_lookup_action (G_ACTION_MAP (win), "redo");
@@ -387,6 +389,8 @@ static const GActionEntry gaction_entries [] = {
     { "find-advanced", G_CALLBACK (advanced_find_cb) },
     // Jump to a certain position
     { "goto", G_CALLBACK (jump_cb) },
+    // Insert/overwrite data
+    { "insert", NULL, NULL, "false", G_CALLBACK (insert_mode_cb) },
 
     // Configure the application
     { "prefs", G_CALLBACK (prefs_cb) },
@@ -419,11 +423,6 @@ static const GtkActionEntry action_entries [] = {
 
 /* Toggle items */
 static const GtkToggleActionEntry toggle_entries[] = {
-    /* Edit menu */
-    { "EditInsertMode", NULL, N_("_Insert Mode"), "Insert",
-      N_("Insert/overwrite data"),
-      G_CALLBACK (insert_mode_cb), FALSE },
-
     /* Windows menu */
     { "CharacterTable", NULL, N_("Character _Table"), NULL,
       N_("Show the character table"),
@@ -527,6 +526,7 @@ ghex_window_constructor (GType                  type,
 {
     GObject    *object;
     GHexWindow *window;
+    GtkWidget  *header;
     GtkWidget  *menubar;
     GtkWidget  *btn;
     GtkWidget  *image;
@@ -598,17 +598,22 @@ ghex_window_constructor (GType                  type,
     gtk_box_pack_end (GTK_BOX (window->vbox), window->statusbar, FALSE, TRUE, 0);
     gtk_widget_show (window->statusbar);
 
+    window->statusbar_insert_mode = gtk_label_new ("OVR");
+    gtk_box_pack_end (GTK_BOX (window->statusbar), window->statusbar_insert_mode, FALSE, TRUE, 0);
+    gtk_widget_show (window->statusbar_insert_mode);
+
+
     gtk_container_add (GTK_CONTAINER (window), window->vbox);
     gtk_widget_show (window->vbox);
 
-    window->header = gtk_header_bar_new ();
-    gtk_header_bar_set_show_close_button (GTK_HEADER_BAR (window->header), TRUE);
-    gtk_window_set_titlebar (GTK_WINDOW (window), window->header);
-    gtk_widget_show (window->header);
+    header = gtk_header_bar_new ();
+    gtk_header_bar_set_show_close_button (GTK_HEADER_BAR (header), TRUE);
+    gtk_window_set_titlebar (GTK_WINDOW (window), header);
+    gtk_widget_show (header);
 
     btn = gtk_button_new_with_label (_("Open"));
     gtk_actionable_set_action_name (GTK_ACTIONABLE (btn), "win.open");
-    gtk_header_bar_pack_start (GTK_HEADER_BAR (window->header), btn);
+    gtk_header_bar_pack_start (GTK_HEADER_BAR (header), btn);
     gtk_widget_show (btn);
 
     appmenu = g_menu_new ();
@@ -645,12 +650,12 @@ ghex_window_constructor (GType                  type,
     image = gtk_image_new_from_icon_name ("open-menu-symbolic", GTK_ICON_SIZE_BUTTON);
     gtk_button_set_image (GTK_BUTTON (btn), image);
     gtk_widget_show (image);
-    gtk_header_bar_pack_end (GTK_HEADER_BAR  (window->header), btn);
+    gtk_header_bar_pack_end (GTK_HEADER_BAR  (header), btn);
     gtk_widget_show (btn);
 
     btn = gtk_button_new_with_label (_("Save"));
     gtk_actionable_set_action_name (GTK_ACTIONABLE (btn), "win.save");
-    gtk_header_bar_pack_end (GTK_HEADER_BAR (window->header), btn);
+    gtk_header_bar_pack_end (GTK_HEADER_BAR (header), btn);
     gtk_widget_show (btn);
 
     return object;

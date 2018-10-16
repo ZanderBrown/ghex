@@ -613,14 +613,24 @@ file_list_activated_cb (GtkAction *action,
 }
 
 void
-insert_mode_cb (GtkAction *action,
-                gpointer   user_data)
+insert_mode_cb (GSimpleAction *action,
+                GVariant *value,
+                GHexWindow *window)
 {
     GHexWindow *win;
-    gboolean active;
+    GVariant   *state;
+    gboolean    active;
 
-    win = GHEX_WINDOW (user_data);
-    active = gtk_toggle_action_get_active (GTK_TOGGLE_ACTION (action));
+    win = GHEX_WINDOW (window);
+    state = g_action_get_state (G_ACTION (action));
+    active = !g_variant_get_boolean (state);
+    if (active) {
+        gtk_label_set_text (GTK_LABEL (win->statusbar_insert_mode), "INS");
+    } else {
+        gtk_label_set_text (GTK_LABEL (win->statusbar_insert_mode), "OVR");
+    }
+    state = g_variant_new_boolean (active);
+    g_simple_action_set_state (action, state);
 
     if (win->gh != NULL)
         gtk_hex_set_insert_mode (win->gh, active);
