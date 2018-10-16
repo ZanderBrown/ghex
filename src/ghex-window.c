@@ -333,6 +333,14 @@ ghex_window_delete_event(GtkWidget *widget, GdkEventAny *e)
     return TRUE;
 }
 
+/* Actions */
+static const GActionEntry gaction_entries [] = {
+    // Help on this application
+    { "help", G_CALLBACK (help_cb) },
+    // About this application
+    { "about", G_CALLBACK (about_cb) }
+};
+
 /* Normal items */
 static const GtkActionEntry action_entries [] = {
     { "File", NULL, N_("_File") },
@@ -340,7 +348,6 @@ static const GtkActionEntry action_entries [] = {
     { "View", NULL, N_("_View") },
     { "GroupDataAs", NULL, N_("_Group Data As") }, // View submenu
     { "Windows", NULL, N_("_Windows") },
-    { "Help", NULL, N_("_Help") },
 
     /* File menu */
     { "FileOpen", GTK_STOCK_OPEN, N_("_Open..."), "<control>O",
@@ -409,15 +416,7 @@ static const GtkActionEntry action_entries [] = {
       G_CALLBACK (add_view_cb) },
     { "ViewRemoveView", NULL, N_("_Remove View"), NULL,
       N_("Remove the current view of the buffer"),
-      G_CALLBACK (remove_view_cb) },
-
-    /* Help menu */
-    { "HelpContents", GTK_STOCK_HELP, N_("_Contents"), "F1",
-      N_("Help on this application"),
-      G_CALLBACK (help_cb) },
-    { "HelpAbout", GTK_STOCK_ABOUT, N_("_About"), NULL,
-      N_("About this application"),
-      G_CALLBACK (about_cb) }
+      G_CALLBACK (remove_view_cb) }
 };
 
 /* Toggle items */
@@ -541,6 +540,11 @@ ghex_window_constructor (GType                  type,
                              n_construct_properties,
                              construct_params);
     window = GHEX_WINDOW (object);
+
+    g_action_map_add_action_entries (G_ACTION_MAP (window),
+                                     gaction_entries,
+                                     G_N_ELEMENTS (gaction_entries),
+                                     window);
 
     window->ui_merge_id = 0;
     window->ui_manager = gtk_ui_manager_new ();

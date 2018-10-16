@@ -134,7 +134,8 @@ create_dialog_title(GtkWidget *window, gchar *title)
  * callbacks for global menus
  */
 void
-about_cb (GtkAction  *action,
+about_cb (GSimpleAction *action,
+          GVariant *value,
           GHexWindow *window)
 {
 	gchar *copyright;
@@ -200,15 +201,16 @@ about_cb (GtkAction  *action,
 }
 
 void
-help_cb (GtkAction  *action,
+help_cb (GSimpleAction *action,
+         GVariant *value,
          GHexWindow *window)
 {
 	GError *error = NULL;
 
-	gtk_show_uri (gtk_widget_get_screen (GTK_WIDGET (window)),
-	              "help:ghex",
-	              gtk_get_current_event_time (),
-	              &error);
+	gtk_show_uri_on_window (GTK_WINDOW (window),
+	                        "help:ghex",
+	                        GDK_CURRENT_TIME,
+	                        &error);
 
 	if (error != NULL) {
 		GtkWidget *dialog;

@@ -38,6 +38,8 @@ static GOptionEntry options[] = {
         { NULL }
 };
 
+const char * const help_accels[] = { "F1", NULL };
+
 #ifdef G_OS_WIN32
 static gchar *
 _ghex_win32_locale_dir (void)
@@ -117,6 +119,9 @@ main(int argc, char **argv)
 
 	application = gtk_application_new ("org.gnome.GHexApplication",
 	                                   G_APPLICATION_NON_UNIQUE);
+
+	gtk_application_set_accels_for_action (application, "win.help", help_accels);
+
 	g_signal_connect (application, "activate",
 	                  G_CALLBACK (ghex_activate), NULL);
 

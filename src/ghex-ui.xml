@@ -51,9 +51,5 @@
       <menuitem action="Converter"/>
       <menuitem action="TypeDialog"/>
     </menu>
-    <menu action="Help">
-      <menuitem action="HelpContents"/>
-      <menuitem action="HelpAbout"/>
-    </menu>
   </menubar>
 </ui>
