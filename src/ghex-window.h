@@ -47,6 +47,7 @@ struct _GHexWindow
     GtkApplicationWindow win;
 
     GtkHex    *gh;
+    GtkWidget *header;
     GtkWidget *vbox;
     GtkWidget *contents;
     GtkWidget *statusbar;

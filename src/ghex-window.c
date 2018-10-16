@@ -531,6 +531,10 @@ ghex_window_constructor (GType                  type,
     GObject    *object;
     GHexWindow *window;
     GtkWidget  *menubar;
+    GtkWidget  *btn;
+    GtkWidget  *image;
+    GMenu      *appmenu;
+    GMenu      *section;
     GError     *error = NULL;
 
     object = G_OBJECT_CLASS (ghex_window_parent_class)->constructor (type,
@@ -594,6 +598,38 @@ ghex_window_constructor (GType                  type,
 
     gtk_container_add (GTK_CONTAINER (window), window->vbox);
     gtk_widget_show (window->vbox);
+
+    window->header = gtk_header_bar_new ();
+    gtk_header_bar_set_show_close_button (GTK_HEADER_BAR (window->header), TRUE);
+    gtk_window_set_titlebar (GTK_WINDOW (window), window->header);
+    gtk_widget_show (window->header);
+
+    btn = gtk_model_button_new ();
+    gtk_button_set_label (GTK_BUTTON (btn), "Open");
+    gtk_actionable_set_action_name (GTK_ACTIONABLE (btn), "win.open");
+    gtk_header_bar_pack_start (GTK_HEADER_BAR (window->header), btn);
+    gtk_widget_show (btn);
+
+    appmenu = g_menu_new ();
+
+    section = g_menu_new ();
+    g_menu_append (section, _("Print"), "win.print");
+    g_menu_append (section, _("Print Preview"), "win.print-preview");
+    g_menu_append_section (appmenu, NULL, G_MENU_MODEL (section));
+
+    section = g_menu_new ();
+    g_menu_append (section, _("Preferences"), "win.prefs");
+    g_menu_append (section, _("Help"), "win.help");
+    g_menu_append (section, _("About GHex"), "win.about");
+    g_menu_append_section (appmenu, NULL, G_MENU_MODEL (section));
+
+    btn = gtk_menu_button_new ();
+    gtk_menu_button_set_menu_model (GTK_MENU_BUTTON (btn), G_MENU_MODEL (appmenu));
+    image = gtk_image_new_from_icon_name ("open-menu-symbolic", GTK_ICON_SIZE_BUTTON);
+    gtk_button_set_image (GTK_BUTTON (btn), image);
+    gtk_widget_show (image);
+    gtk_header_bar_pack_end (GTK_HEADER_BAR  (window->header), btn);
+    gtk_widget_show (btn);
 
     return object;
 }
