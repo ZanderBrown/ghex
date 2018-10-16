@@ -38,7 +38,14 @@ static GOptionEntry options[] = {
         { NULL }
 };
 
+const char * const open_accels[] = { "<primary>o", NULL };
+const char * const save_accels[] = { "<primary>s", NULL };
+const char * const save_as_accels[] = { "<primary><shift>s", NULL };
+const char * const print_accels[] = { "<primary>p", NULL };
+const char * const print_pre_accels[] = { "<primary><shift>p", NULL };
 const char * const help_accels[] = { "F1", NULL };
+const char * const quit_accels[] = { "<primary>q", NULL };
+const char * const close_accels[] = { "<primary>w", NULL };
 
 #ifdef G_OS_WIN32
 static gchar *
@@ -120,7 +127,14 @@ main(int argc, char **argv)
 	application = gtk_application_new ("org.gnome.GHexApplication",
 	                                   G_APPLICATION_NON_UNIQUE);
 
+	gtk_application_set_accels_for_action (application, "win.open", open_accels);
+	gtk_application_set_accels_for_action (application, "win.save", save_accels);
+	gtk_application_set_accels_for_action (application, "win.save-as", save_as_accels);
+	gtk_application_set_accels_for_action (application, "win.print", print_accels);
+	gtk_application_set_accels_for_action (application, "win.print-preview", print_pre_accels);
 	gtk_application_set_accels_for_action (application, "win.help", help_accels);
+	gtk_application_set_accels_for_action (application, "win.quit", quit_accels);
+	gtk_application_set_accels_for_action (application, "win.close", close_accels);
 
 	g_signal_connect (application, "activate",
 	                  G_CALLBACK (ghex_activate), NULL);

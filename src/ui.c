@@ -263,8 +263,9 @@ cut_cb (GtkAction *action,
 }
 
 void
-quit_app_cb (GtkAction *action,
-             gpointer   user_data)
+quit_app_cb (GSimpleAction *action,
+             GVariant *value,
+             GHexWindow *window)
 {
 	const GList *doc_node;
 	GHexWindow *win;
@@ -282,10 +283,11 @@ quit_app_cb (GtkAction *action,
 }
 
 void
-save_cb (GtkAction *action,
-         gpointer   user_data)
+save_cb (GSimpleAction *action,
+         GVariant *value,
+         GHexWindow *window)
 {
-	GHexWindow *win = GHEX_WINDOW(user_data);
+	GHexWindow *win = GHEX_WINDOW(window);
 	HexDocument *doc;
 
 	if(win->gh)
@@ -318,14 +320,15 @@ save_cb (GtkAction *action,
 }
 
 void
-open_cb (GtkAction *action,
-         gpointer   user_data)
+open_cb (GSimpleAction *action,
+         GVariant *value,
+         GHexWindow *window)
 {
 	GHexWindow *win;
 	GtkWidget *file_sel;
 	GtkResponseType resp;
 
-	win = GHEX_WINDOW(user_data);
+	win = GHEX_WINDOW(window);
 
 	file_sel = gtk_file_chooser_dialog_new(_("Select a file to open"),
 										   GTK_WINDOW(win),
@@ -374,10 +377,11 @@ open_cb (GtkAction *action,
 }
 
 void
-save_as_cb (GtkAction *action,
-            gpointer   user_data)
+save_as_cb (GSimpleAction *action,
+            GVariant *value,
+            GHexWindow *window)
 {
-	GHexWindow *win = GHEX_WINDOW(user_data);
+	GHexWindow *win = GHEX_WINDOW(window);
 	HexDocument *doc;
 
 	if(win->gh)
@@ -392,10 +396,11 @@ save_as_cb (GtkAction *action,
 }
 
 void
-print_cb (GtkAction *action,
-          gpointer   user_data)
+print_cb (GSimpleAction *action,
+          GVariant *value,
+          GHexWindow *window)
 {
-	GHexWindow *win = GHEX_WINDOW(user_data);
+	GHexWindow *win = GHEX_WINDOW(window);
 
 	if(win->gh == NULL)
 		return;
@@ -404,10 +409,11 @@ print_cb (GtkAction *action,
 }
 
 void
-print_preview_cb (GtkAction *action,
-                  gpointer   user_data)
+print_preview_cb (GSimpleAction *action,
+                  GVariant *value,
+                  GHexWindow *window)
 {
-	GHexWindow *win = GHEX_WINDOW(user_data);
+	GHexWindow *win = GHEX_WINDOW(window);
 
 	if(win->gh == NULL)
 		return;
@@ -416,10 +422,11 @@ print_preview_cb (GtkAction *action,
 }
 
 void
-export_html_cb (GtkAction *action,
-                gpointer   user_data)
+export_html_cb (GSimpleAction *action,
+                GVariant *value,
+                GHexWindow *window)
 {
-	GHexWindow *win = GHEX_WINDOW(user_data);
+	GHexWindow *win = GHEX_WINDOW(window);
 	HexDocument *doc;
 	GtkWidget *file_sel;
 	GtkResponseType resp;
@@ -520,10 +527,11 @@ export_html_cb (GtkAction *action,
 }
 
 void
-close_cb (GtkAction *action,
-          gpointer   user_data)
+close_cb (GSimpleAction *action,
+          GVariant *value,
+          GHexWindow *window)
 {
-	GHexWindow *win = GHEX_WINDOW(user_data), *other_win;
+	GHexWindow *win = GHEX_WINDOW(window), *other_win;
 	HexDocument *doc;
 	const GList *window_list;
 
@@ -732,15 +740,16 @@ prefs_cb (GtkAction *action,
 
 
 void
-revert_cb (GtkAction *action,
-           gpointer   user_data)
+revert_cb (GSimpleAction *action,
+           GVariant *value,
+           GHexWindow *window)
 {
 	GHexWindow *win;
    	HexDocument *doc;
 	GtkWidget *mbox;
 	gint reply;
 	
-	win = GHEX_WINDOW(user_data);
+	win = GHEX_WINDOW(window);
 	if(win->gh)
 		doc = win->gh->document;
 	else

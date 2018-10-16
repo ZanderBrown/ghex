@@ -1,21 +1,5 @@
 <ui>
   <menubar name="MainMenu">
-    <menu action="File">
-      <menuitem action="FileOpen"/>
-      <separator/>
-      <menuitem action="FileSave"/>
-      <menuitem action="FileSaveAs"/>
-      <menuitem action="FileExportToHTML"/>
-      <separator/>
-      <menuitem action="FileRevert"/>
-      <separator/>
-      <menuitem action="FilePrint"/>
-      <menuitem action="FilePrintPreview"/>
-      <separator/>
-      <menuitem action="FileClose"/>
-      <menuitem action="FileExit"/>
-    </menu>
-
     <menu action="Edit">
       <menuitem action="EditUndo"/>
       <menuitem action="EditRedo"/>

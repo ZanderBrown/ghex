@@ -46,15 +46,15 @@ gint delete_event_cb(GtkWidget *, GdkEventAny *, GtkWindow *);
 void cancel_cb      (GtkWidget *, GtkWidget *);
 
 /* File menu */
-void open_cb (GtkAction *action, gpointer user_data);
-void save_cb (GtkAction *action, gpointer user_data);
-void save_as_cb (GtkAction *action, gpointer user_data);
-void export_html_cb (GtkAction *action, gpointer user_data);
-void revert_cb (GtkAction *action, gpointer user_data);
-void print_cb (GtkAction *action, gpointer user_data);
-void print_preview_cb (GtkAction *action, gpointer user_data);
-void close_cb (GtkAction *action, gpointer user_data);
-void quit_app_cb (GtkAction *action, gpointer user_data);
+void open_cb (GSimpleAction *action, GVariant *value, GHexWindow *window);
+void save_cb (GSimpleAction *action, GVariant *value, GHexWindow *window);
+void save_as_cb (GSimpleAction *action, GVariant *value, GHexWindow *window);
+void export_html_cb (GSimpleAction *action, GVariant *value, GHexWindow *window);
+void revert_cb (GSimpleAction *action, GVariant *value, GHexWindow *window);
+void print_cb (GSimpleAction *action, GVariant *value, GHexWindow *window);
+void print_preview_cb (GSimpleAction *action, GVariant *value, GHexWindow *window);
+void close_cb (GSimpleAction *action, GVariant *value, GHexWindow *window);
+void quit_app_cb (GSimpleAction *action, GVariant *value, GHexWindow *window);
 
 /* Edit menu */
 void undo_cb (GtkAction *action, gpointer user_data);

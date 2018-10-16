@@ -221,6 +221,7 @@ ghex_window_get_toggle_action_active (GHexWindow *win,
 void
 ghex_window_set_sensitivity (GHexWindow *win)
 {
+    GAction *act;
     gboolean allmenus = (win->gh != NULL);
 
     win->undo_sens = (allmenus && (win->gh->document->undo_top != NULL));
@@ -229,13 +230,18 @@ ghex_window_set_sensitivity (GHexWindow *win)
     ghex_window_set_action_visible (win, "View", allmenus);
 
     /* File menu */
-    ghex_window_set_action_sensitive (win, "FileClose", allmenus);
-    ghex_window_set_action_sensitive (win, "FileSave", allmenus && win->gh->document->changed);
-    ghex_window_set_action_sensitive (win, "FileSaveAs", allmenus);
-    ghex_window_set_action_sensitive (win, "FileExportToHTML", allmenus);
-    ghex_window_set_action_sensitive (win, "FileRevert", allmenus && win->gh->document->changed);
-    ghex_window_set_action_sensitive (win, "FilePrint", allmenus);
-    ghex_window_set_action_sensitive (win, "FilePrintPreview", allmenus);
+    act = g_action_map_lookup_action (G_ACTION_MAP (win), "close");
+    g_simple_action_set_enabled (G_SIMPLE_ACTION (act), allmenus);
+    act = g_action_map_lookup_action (G_ACTION_MAP (win), "save-as");
+    g_simple_action_set_enabled (G_SIMPLE_ACTION (act), allmenus);
+    act = g_action_map_lookup_action (G_ACTION_MAP (win), "export");
+    g_simple_action_set_enabled (G_SIMPLE_ACTION (act), allmenus);
+    act = g_action_map_lookup_action (G_ACTION_MAP (win), "revert");
+    g_simple_action_set_enabled (G_SIMPLE_ACTION (act), allmenus && win->gh->document->changed);
+    act = g_action_map_lookup_action (G_ACTION_MAP (win), "print");
+    g_simple_action_set_enabled (G_SIMPLE_ACTION (act), allmenus);
+    act = g_action_map_lookup_action (G_ACTION_MAP (win), "print-preview");
+    g_simple_action_set_enabled (G_SIMPLE_ACTION (act), allmenus);
 
     /* Edit menu */
     ghex_window_set_action_sensitive (win, "EditFind", allmenus);
@@ -335,10 +341,30 @@ ghex_window_delete_event(GtkWidget *widget, GdkEventAny *e)
 
 /* Actions */
 static const GActionEntry gaction_entries [] = {
+    // Open a file
+    { "open", G_CALLBACK (open_cb) },
+    // Save the current file
+    { "save", G_CALLBACK (save_cb) },
+    // Save the current file with a different name
+    { "save-as", G_CALLBACK (save_as_cb) },
+    // Export data to HTML source
+    { "export", G_CALLBACK (export_html_cb) },
+    // Revert to a saved version of the file
+    { "revert", G_CALLBACK (revert_cb) },
+
+    // Print the current file
+    { "print", G_CALLBACK (print_cb) },
+    // Preview printed data
+    { "print-preview", G_CALLBACK (print_preview_cb) },
+
     // Help on this application
     { "help", G_CALLBACK (help_cb) },
     // About this application
-    { "about", G_CALLBACK (about_cb) }
+    { "about", G_CALLBACK (about_cb) },
+    // Exit the program
+    { "quit", G_CALLBACK (quit_app_cb) },
+    // Close the current file
+    { "close", G_CALLBACK (close_cb) }
 };
 
 /* Normal items */
@@ -348,35 +374,6 @@ static const GtkActionEntry action_entries [] = {
     { "View", NULL, N_("_View") },
     { "GroupDataAs", NULL, N_("_Group Data As") }, // View submenu
     { "Windows", NULL, N_("_Windows") },
-
-    /* File menu */
-    { "FileOpen", GTK_STOCK_OPEN, N_("_Open..."), "<control>O",
-      N_("Open a file"),
-      G_CALLBACK (open_cb) },
-    { "FileSave", GTK_STOCK_SAVE, N_("_Save"), "<control>S",
-      N_("Save the current file"),
-      G_CALLBACK (save_cb) },
-    { "FileSaveAs", GTK_STOCK_SAVE_AS, N_("Save _As..."), "<shift><control>S",
-      N_("Save the current file with a different name"),
-      G_CALLBACK (save_as_cb) },
-    { "FileExportToHTML", NULL, N_("Save As _HTML..."), NULL,
-      N_("Export data to HTML source"),
-      G_CALLBACK (export_html_cb) },
-    { "FileRevert", GTK_STOCK_REVERT_TO_SAVED, N_("_Revert"), NULL,
-      N_("Revert to a saved version of the file"),
-      G_CALLBACK (revert_cb) },
-    { "FilePrint", GTK_STOCK_PRINT, N_("_Print"), "<control>P",
-      N_("Print the current file"),
-      G_CALLBACK (print_cb) },
-    { "FilePrintPreview", GTK_STOCK_PRINT_PREVIEW, N_("Print Previe_w..."), "<shift><control>P",
-      N_("Preview printed data"),
-      G_CALLBACK (print_preview_cb) },
-    { "FileClose", GTK_STOCK_CLOSE, N_("_Close"), "<control>W",
-      N_("Close the current file"),
-      G_CALLBACK (close_cb) },
-    { "FileExit", GTK_STOCK_QUIT, N_("E_xit"), "<control>Q",
-      N_("Exit the program"),
-      G_CALLBACK (quit_app_cb) },
 
     /* Edit menu */
     { "EditUndo", GTK_STOCK_UNDO, N_("_Undo"), "<control>Z",
@@ -608,13 +605,21 @@ ghex_window_constructor (GType                  type,
     gtk_window_set_titlebar (GTK_WINDOW (window), window->header);
     gtk_widget_show (window->header);
 
-    btn = gtk_model_button_new ();
-    gtk_button_set_label (GTK_BUTTON (btn), "Open");
+    btn = gtk_button_new_with_label (_("Open"));
     gtk_actionable_set_action_name (GTK_ACTIONABLE (btn), "win.open");
     gtk_header_bar_pack_start (GTK_HEADER_BAR (window->header), btn);
     gtk_widget_show (btn);
 
     appmenu = g_menu_new ();
+
+    section = g_menu_new ();
+    g_menu_append (section, _("Revert"), "win.revert");
+    g_menu_append_section (appmenu, NULL, G_MENU_MODEL (section));
+
+    section = g_menu_new ();
+    g_menu_append (section, _("Save As..."), "win.save-as");
+    g_menu_append (section, _("Export..."), "win.export");
+    g_menu_append_section (appmenu, NULL, G_MENU_MODEL (section));
 
     section = g_menu_new ();
     g_menu_append (section, _("Print"), "win.print");
@@ -633,6 +638,11 @@ ghex_window_constructor (GType                  type,
     gtk_button_set_image (GTK_BUTTON (btn), image);
     gtk_widget_show (image);
     gtk_header_bar_pack_end (GTK_HEADER_BAR  (window->header), btn);
+    gtk_widget_show (btn);
+
+    btn = gtk_button_new_from_icon_name ("document-save-symbolic", GTK_ICON_SIZE_BUTTON);
+    gtk_actionable_set_action_name (GTK_ACTIONABLE (btn), "win.save");
+    gtk_header_bar_pack_end (GTK_HEADER_BAR (window->header), btn);
     gtk_widget_show (btn);
 
     return object;
