@@ -233,30 +233,33 @@ help_cb (GSimpleAction *action,
 }
 
 void 
-paste_cb (GtkAction *action,
-          gpointer   user_data)
+paste_cb (GSimpleAction *action,
+          GVariant *value,
+          GHexWindow *window)
 {
-	GHexWindow *win = GHEX_WINDOW(user_data);
+	GHexWindow *win = GHEX_WINDOW(window);
 
 	if(win->gh)
 		gtk_hex_paste_from_clipboard(win->gh);
 }
 
 void 
-copy_cb (GtkAction *action,
-         gpointer   user_data)
+copy_cb (GSimpleAction *action,
+         GVariant *value,
+         GHexWindow *window)
 {
-	GHexWindow *win = GHEX_WINDOW(user_data);
+	GHexWindow *win = GHEX_WINDOW(window);
 
 	if(win->gh)
 		gtk_hex_copy_to_clipboard(win->gh);
 }
 
 void 
-cut_cb (GtkAction *action,
-        gpointer   user_data)
+cut_cb (GSimpleAction *action,
+        GVariant *value,
+        GHexWindow *window)
 {
-	GHexWindow *win = GHEX_WINDOW(user_data);
+	GHexWindow *win = GHEX_WINDOW(window);
 
 	if(win->gh)
 		gtk_hex_cut_to_clipboard(win->gh);
@@ -720,17 +723,18 @@ group_data_cb (GtkAction      *action,
 }
 
 void
-prefs_cb (GtkAction *action,
-          gpointer   user_data)
+prefs_cb (GSimpleAction *action,
+          GVariant *value,
+          GHexWindow *window)
 {
 	if(!prefs_ui)
 		prefs_ui = create_prefs_dialog();
 
 	set_current_prefs(prefs_ui);
 
-	if(ghex_window_get_active() != NULL)
+	if(window != NULL)
 		gtk_window_set_transient_for(GTK_WINDOW(prefs_ui->pbox),
-									 GTK_WINDOW(ghex_window_get_active()));
+									 GTK_WINDOW(window));
 	if(!gtk_widget_get_visible(prefs_ui->pbox)) {
 		gtk_window_set_position (GTK_WINDOW(prefs_ui->pbox), GTK_WIN_POS_MOUSE);
 		gtk_widget_show(GTK_WIDGET(prefs_ui->pbox));

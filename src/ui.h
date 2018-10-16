@@ -57,17 +57,17 @@ void close_cb (GSimpleAction *action, GVariant *value, GHexWindow *window);
 void quit_app_cb (GSimpleAction *action, GVariant *value, GHexWindow *window);
 
 /* Edit menu */
-void undo_cb (GtkAction *action, gpointer user_data);
-void redo_cb (GtkAction *action, gpointer user_data);
-void copy_cb (GtkAction *action, gpointer user_data);
-void cut_cb (GtkAction *action, gpointer user_data);
-void paste_cb (GtkAction *action, gpointer user_data);
-void find_cb (GtkAction *action, gpointer user_data);
-void advanced_find_cb (GtkAction *action, gpointer user_data);
-void replace_cb (GtkAction *action, gpointer user_data);
-void jump_cb (GtkAction *action, gpointer user_data);
+void undo_cb (GSimpleAction *action, GVariant *value, GHexWindow *window);
+void redo_cb (GSimpleAction *action, GVariant *value, GHexWindow *window);
+void copy_cb (GSimpleAction *action, GVariant *value, GHexWindow *window);
+void cut_cb (GSimpleAction *action, GVariant *value, GHexWindow *window);
+void paste_cb (GSimpleAction *action, GVariant *value, GHexWindow *window);
+void find_cb (GSimpleAction *action, GVariant *value, GHexWindow *window);
+void advanced_find_cb (GSimpleAction *action, GVariant *value, GHexWindow *window);
+void replace_cb (GSimpleAction *action, GVariant *value, GHexWindow *window);
+void jump_cb (GSimpleAction *action, GVariant *value, GHexWindow *window);
 void insert_mode_cb (GtkAction *action, gpointer user_data);
-void prefs_cb (GtkAction *action, gpointer user_data);
+void prefs_cb (GSimpleAction *action, GVariant *value, GHexWindow *window);
 
 /* View menu */
 void add_view_cb (GtkAction *action, gpointer user_data);

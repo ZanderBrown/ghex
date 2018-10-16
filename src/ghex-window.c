@@ -244,16 +244,25 @@ ghex_window_set_sensitivity (GHexWindow *win)
     g_simple_action_set_enabled (G_SIMPLE_ACTION (act), allmenus);
 
     /* Edit menu */
-    ghex_window_set_action_sensitive (win, "EditFind", allmenus);
-    ghex_window_set_action_sensitive (win, "EditReplace", allmenus);
-    ghex_window_set_action_sensitive (win, "EditAdvancedFind", allmenus);
-    ghex_window_set_action_sensitive (win, "EditGotoByte", allmenus);
+    act = g_action_map_lookup_action (G_ACTION_MAP (win), "find");
+    g_simple_action_set_enabled (G_SIMPLE_ACTION (act), allmenus);
+    act = g_action_map_lookup_action (G_ACTION_MAP (win), "replace");
+    g_simple_action_set_enabled (G_SIMPLE_ACTION (act), allmenus);
+    act = g_action_map_lookup_action (G_ACTION_MAP (win), "find-advanced");
+    g_simple_action_set_enabled (G_SIMPLE_ACTION (act), allmenus);
+    act = g_action_map_lookup_action (G_ACTION_MAP (win), "goto");
+    g_simple_action_set_enabled (G_SIMPLE_ACTION (act), allmenus);
     ghex_window_set_action_sensitive (win, "EditInsertMode", allmenus);
-    ghex_window_set_action_sensitive (win, "EditUndo", allmenus && win->undo_sens);
-    ghex_window_set_action_sensitive (win, "EditRedo", allmenus && win->redo_sens);
-    ghex_window_set_action_sensitive (win, "EditCut", allmenus);
-    ghex_window_set_action_sensitive (win, "EditCopy", allmenus);
-    ghex_window_set_action_sensitive (win, "EditPaste", allmenus);
+    act = g_action_map_lookup_action (G_ACTION_MAP (win), "undo");
+    g_simple_action_set_enabled (G_SIMPLE_ACTION (act), allmenus && win->undo_sens);
+    act = g_action_map_lookup_action (G_ACTION_MAP (win), "redo");
+    g_simple_action_set_enabled (G_SIMPLE_ACTION (act), allmenus && win->redo_sens);
+    act = g_action_map_lookup_action (G_ACTION_MAP (win), "cut");
+    g_simple_action_set_enabled (G_SIMPLE_ACTION (act), allmenus);
+    act = g_action_map_lookup_action (G_ACTION_MAP (win), "copy");
+    g_simple_action_set_enabled (G_SIMPLE_ACTION (act), allmenus);
+    act = g_action_map_lookup_action (G_ACTION_MAP (win), "paste");
+    g_simple_action_set_enabled (G_SIMPLE_ACTION (act), allmenus);
 }
 
 static void
@@ -261,6 +270,7 @@ ghex_window_doc_changed(HexDocument *doc, HexChangeData *change_data,
                         gboolean push_undo, gpointer user_data)
 {
     GHexWindow *win = GHEX_WINDOW(user_data);
+    GAction    *act;
 
     if(!win->gh->document->changed)
         return;
@@ -272,12 +282,14 @@ ghex_window_doc_changed(HexDocument *doc, HexChangeData *change_data,
     else if(push_undo) {
         if(win->undo_sens != ( win->gh->document->undo_top == NULL)) {
             win->undo_sens = (win->gh->document->undo_top != NULL);
-            ghex_window_set_action_sensitive (win, "EditUndo", win->undo_sens);
+            act = g_action_map_lookup_action (G_ACTION_MAP (win), "undo");
+            g_simple_action_set_enabled (G_SIMPLE_ACTION (act), win->undo_sens);
         }
         if(win->redo_sens != (win->gh->document->undo_stack != NULL && (win->gh->document->undo_stack != win->gh->document->undo_top))) {
             win->redo_sens = (win->gh->document->undo_stack != NULL &&
                               (win->gh->document->undo_top != win->gh->document->undo_stack));
-            ghex_window_set_action_sensitive (win, "EditRedo", win->redo_sens);
+            act = g_action_map_lookup_action (G_ACTION_MAP (win), "redo");
+            g_simple_action_set_enabled (G_SIMPLE_ACTION (act), win->redo_sens);
         }
     }
 }
@@ -351,12 +363,33 @@ static const GActionEntry gaction_entries [] = {
     { "export", G_CALLBACK (export_html_cb) },
     // Revert to a saved version of the file
     { "revert", G_CALLBACK (revert_cb) },
-
     // Print the current file
     { "print", G_CALLBACK (print_cb) },
     // Preview printed data
     { "print-preview", G_CALLBACK (print_preview_cb) },
 
+    // Undo the last action
+    { "undo", G_CALLBACK (undo_cb) },
+    // Redo the undone action
+    { "redo", G_CALLBACK (redo_cb) },
+    // Cut selection
+    { "cut", G_CALLBACK (cut_cb) },
+    // Copy selection to clipboard
+    { "copy", G_CALLBACK (copy_cb) },
+    // Paste data from clipboard
+    { "paste", G_CALLBACK (paste_cb) },
+
+    // Search for a string
+    { "find", G_CALLBACK (find_cb) },
+    // Replace a string
+    { "replace", G_CALLBACK (replace_cb) },
+    // Advanced Find
+    { "find-advanced", G_CALLBACK (advanced_find_cb) },
+    // Jump to a certain position
+    { "goto", G_CALLBACK (jump_cb) },
+
+    // Configure the application
+    { "prefs", G_CALLBACK (prefs_cb) },
     // Help on this application
     { "help", G_CALLBACK (help_cb) },
     // About this application
@@ -374,38 +407,6 @@ static const GtkActionEntry action_entries [] = {
     { "View", NULL, N_("_View") },
     { "GroupDataAs", NULL, N_("_Group Data As") }, // View submenu
     { "Windows", NULL, N_("_Windows") },
-
-    /* Edit menu */
-    { "EditUndo", GTK_STOCK_UNDO, N_("_Undo"), "<control>Z",
-      N_("Undo the last action"),
-      G_CALLBACK (undo_cb) },
-    { "EditRedo", GTK_STOCK_REDO, N_("_Redo"), "<shift><control>Z",
-      N_("Redo the undone action"),
-      G_CALLBACK (redo_cb) },
-    { "EditCopy", GTK_STOCK_COPY, N_("_Copy"), "<control>C",
-      N_("Copy selection to clipboard"),
-      G_CALLBACK (copy_cb) },
-    { "EditCut", GTK_STOCK_CUT, N_("Cu_t"), "<control>X",
-      N_("Cut selection"),
-      G_CALLBACK (cut_cb) },
-    { "EditPaste", GTK_STOCK_PASTE, N_("Pa_ste"), "<control>V",
-      N_("Paste data from clipboard"),
-      G_CALLBACK (paste_cb) },
-    { "EditFind", GTK_STOCK_FIND, N_("_Find"), "<control>F",
-      N_("Search for a string"),
-      G_CALLBACK (find_cb) },
-    { "EditAdvancedFind", GTK_STOCK_FIND, N_("_Advanced Find"), NULL,
-      N_("Advanced Find"),
-      G_CALLBACK (advanced_find_cb) },
-    { "EditReplace", GTK_STOCK_FIND_AND_REPLACE, N_("R_eplace"), "<control>H",
-      N_("Replace a string"),
-      G_CALLBACK (replace_cb) },
-    { "EditGotoByte", NULL, N_("_Goto Byte..."), "<control>J",
-      N_("Jump to a certain position"),
-      G_CALLBACK (jump_cb) },
-    { "EditPreferences", GTK_STOCK_PREFERENCES, N_("_Preferences"), NULL,
-      N_("Configure the application"),
-      G_CALLBACK (prefs_cb) },
 
     /* View menu */
     { "ViewAddView", NULL, N_("_Add View"), NULL,
@@ -622,8 +623,15 @@ ghex_window_constructor (GType                  type,
     g_menu_append_section (appmenu, NULL, G_MENU_MODEL (section));
 
     section = g_menu_new ();
-    g_menu_append (section, _("Print"), "win.print");
-    g_menu_append (section, _("Print Preview"), "win.print-preview");
+    g_menu_append (section, _("Find..."), "win.find");
+    g_menu_append (section, _("Find and Replace..."), "win.replace");
+    g_menu_append (section, _("Advanced Find..."), "win.find-advanced");
+    g_menu_append (section, _("Go to Byte..."), "win.goto");
+    g_menu_append_section (appmenu, NULL, G_MENU_MODEL (section));
+
+    section = g_menu_new ();
+    g_menu_append (section, _("Print..."), "win.print");
+    g_menu_append (section, _("Print Preview..."), "win.print-preview");
     g_menu_append_section (appmenu, NULL, G_MENU_MODEL (section));
 
     section = g_menu_new ();
@@ -640,7 +648,7 @@ ghex_window_constructor (GType                  type,
     gtk_header_bar_pack_end (GTK_HEADER_BAR  (window->header), btn);
     gtk_widget_show (btn);
 
-    btn = gtk_button_new_from_icon_name ("document-save-symbolic", GTK_ICON_SIZE_BUTTON);
+    btn = gtk_button_new_with_label (_("Save"));
     gtk_actionable_set_action_name (GTK_ACTIONABLE (btn), "win.save");
     gtk_header_bar_pack_end (GTK_HEADER_BAR (window->header), btn);
     gtk_widget_show (btn);

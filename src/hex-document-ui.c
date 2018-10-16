@@ -38,6 +38,7 @@ set_doc_menu_sensitivity(HexDocument *doc)
 	GtkWidget *view;
 	gboolean sensitive;
 	GHexWindow *win;
+	GAction *act;
 
 	view_node = doc->views;
 
@@ -49,10 +50,12 @@ set_doc_menu_sensitivity(HexDocument *doc)
 		g_return_if_fail (win != NULL);
  
 		sensitive = doc->undo_top != NULL;
-		ghex_window_set_action_sensitive (win, "EditUndo", sensitive);
+		act = g_action_map_lookup_action (G_ACTION_MAP (win), "undo");
+		g_simple_action_set_enabled (G_SIMPLE_ACTION (act), sensitive);
 	
 		sensitive = doc->undo_stack && doc->undo_top != doc->undo_stack;
-		ghex_window_set_action_sensitive (win, "EditRedo", sensitive);
+		act = g_action_map_lookup_action (G_ACTION_MAP (win), "redo");
+		g_simple_action_set_enabled (G_SIMPLE_ACTION (act), sensitive);
 
 		view_node = view_node->next;
 	}
@@ -60,8 +63,9 @@ set_doc_menu_sensitivity(HexDocument *doc)
 }
 
 void
-find_cb (GtkAction *action,
-         gpointer   user_data)
+find_cb (GSimpleAction *action,
+         GVariant *value,
+         GHexWindow *window)
 {
 	if(!find_dialog)
 		find_dialog = create_find_dialog();
@@ -75,10 +79,11 @@ find_cb (GtkAction *action,
 }
 
 void
-advanced_find_cb (GtkAction *action,
-                  gpointer   user_data)
+advanced_find_cb (GSimpleAction *action,
+                  GVariant *value,
+                  GHexWindow *window)
 {
-	GHexWindow *win = GHEX_WINDOW(user_data);
+	GHexWindow *win = GHEX_WINDOW(window);
 	if (!win->advanced_find_dialog)
 		win->advanced_find_dialog = create_advanced_find_dialog(win);
 
@@ -93,8 +98,9 @@ advanced_find_cb (GtkAction *action,
 
 
 void
-replace_cb (GtkAction *action,
-            gpointer   user_data)
+replace_cb (GSimpleAction *action,
+            GVariant *value,
+            GHexWindow *window)
 {
 	if(!replace_dialog)
 		replace_dialog = create_replace_dialog();
@@ -108,8 +114,9 @@ replace_cb (GtkAction *action,
 }
 
 void
-jump_cb (GtkAction *action,
-         gpointer   user_data)
+jump_cb (GSimpleAction *action,
+         GVariant *value,
+         GHexWindow *window)
 {
 	if(!jump_dialog)
 		jump_dialog = create_jump_dialog();
@@ -124,10 +131,11 @@ jump_cb (GtkAction *action,
 }
 
 void
-undo_cb (GtkAction *action,
-         gpointer   user_data)
+undo_cb (GSimpleAction *action,
+         GVariant *value,
+         GHexWindow *window)
 {
-	GHexWindow *win = GHEX_WINDOW(user_data);
+	GHexWindow *win = GHEX_WINDOW(window);
 	HexDocument *doc;
 	HexChangeData *cd;
 
@@ -147,10 +155,11 @@ undo_cb (GtkAction *action,
 }
 
 void
-redo_cb (GtkAction *action,
-         gpointer   user_data)
+redo_cb (GSimpleAction *action,
+         GVariant *value,
+         GHexWindow *window)
 {
-	GHexWindow *win = GHEX_WINDOW(user_data);
+	GHexWindow *win = GHEX_WINDOW(window);
 	HexDocument *doc;
 	HexChangeData *cd;
 

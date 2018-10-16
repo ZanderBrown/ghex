@@ -43,6 +43,14 @@ const char * const save_accels[] = { "<primary>s", NULL };
 const char * const save_as_accels[] = { "<primary><shift>s", NULL };
 const char * const print_accels[] = { "<primary>p", NULL };
 const char * const print_pre_accels[] = { "<primary><shift>p", NULL };
+const char * const undo_accels[] = { "<primary>z", NULL };
+const char * const redo_accels[] = { "<primary><shift>z", NULL };
+const char * const cut_accels[] = { "<primary>x", NULL };
+const char * const copy_accels[] = { "<primary>c", NULL };
+const char * const paste_accels[] = { "<primary>v", NULL };
+const char * const find_accels[] = { "<primary>f", NULL };
+const char * const replace_accels[] = { "<primary>h", NULL };
+const char * const jump_accels[] = { "<primary>j", NULL };
 const char * const help_accels[] = { "F1", NULL };
 const char * const quit_accels[] = { "<primary>q", NULL };
 const char * const close_accels[] = { "<primary>w", NULL };
@@ -132,6 +140,17 @@ main(int argc, char **argv)
 	gtk_application_set_accels_for_action (application, "win.save-as", save_as_accels);
 	gtk_application_set_accels_for_action (application, "win.print", print_accels);
 	gtk_application_set_accels_for_action (application, "win.print-preview", print_pre_accels);
+
+	gtk_application_set_accels_for_action (application, "win.undo", undo_accels);
+	gtk_application_set_accels_for_action (application, "win.redo", redo_accels);
+	gtk_application_set_accels_for_action (application, "win.cut", cut_accels);
+	gtk_application_set_accels_for_action (application, "win.copy", copy_accels);
+	gtk_application_set_accels_for_action (application, "win.paste", paste_accels);
+
+	gtk_application_set_accels_for_action (application, "win.find", find_accels);
+	gtk_application_set_accels_for_action (application, "win.replace", replace_accels);
+	gtk_application_set_accels_for_action (application, "win.goto", jump_accels);
+
 	gtk_application_set_accels_for_action (application, "win.help", help_accels);
 	gtk_application_set_accels_for_action (application, "win.quit", quit_accels);
 	gtk_application_set_accels_for_action (application, "win.close", close_accels);

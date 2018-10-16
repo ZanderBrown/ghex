@@ -1,22 +1,7 @@
 <ui>
   <menubar name="MainMenu">
     <menu action="Edit">
-      <menuitem action="EditUndo"/>
-      <menuitem action="EditRedo"/>
-      <separator/>
-      <menuitem action="EditCopy"/>
-      <menuitem action="EditCut"/>
-      <menuitem action="EditPaste"/>
-      <separator/>
-      <menuitem action="EditFind"/>
-      <menuitem action="EditAdvancedFind"/>
-      <menuitem action="EditReplace"/>
-      <separator/>
-      <menuitem action="EditGotoByte"/>
-      <separator/>
       <menuitem action="EditInsertMode"/>
-      <separator/>
-      <menuitem action="EditPreferences"/>
     </menu>
     <menu action="View">
       <menuitem action="ViewAddView"/>
