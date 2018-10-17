@@ -147,7 +147,7 @@ FindDialog *create_find_dialog()
 static AdvancedFind_AddDialog *create_advanced_find_add_dialog(AdvancedFindDialog *parent)
 {
 	AdvancedFind_AddDialog *dialog = g_new0(AdvancedFind_AddDialog, 1);
-	GtkWidget *button, *frame, *sep;
+	GtkWidget *button, *frame;
 
 	dialog->window = gtk_dialog_new();
 	gtk_widget_hide(dialog->window);
@@ -165,16 +165,11 @@ static AdvancedFind_AddDialog *create_advanced_find_add_dialog(AdvancedFindDialo
 	gtk_widget_show(frame);
 	gtk_widget_show(dialog->f_gh);
 
-	sep = gtk_separator_new (GTK_ORIENTATION_HORIZONTAL);
-	gtk_box_pack_start(GTK_BOX(gtk_dialog_get_content_area(GTK_DIALOG(dialog->window))), sep,
-					   FALSE, FALSE, 0);
-
-	dialog->colour = gtk_color_selection_new();
-	gtk_color_selection_set_has_opacity_control(GTK_COLOR_SELECTION(dialog->colour),
-												FALSE);
-	gtk_box_pack_start(GTK_BOX(gtk_dialog_get_content_area(GTK_DIALOG(dialog->window))),
-					   dialog->colour, FALSE, FALSE, 0);
-	gtk_widget_show(dialog->colour);
+	dialog->colour = gtk_color_chooser_widget_new ();
+	gtk_color_chooser_set_use_alpha (GTK_COLOR_CHOOSER (dialog->colour), FALSE);
+	gtk_box_pack_start (GTK_BOX (gtk_dialog_get_content_area (GTK_DIALOG (dialog->window))),
+					    dialog->colour, FALSE, FALSE, 8);
+	gtk_widget_show (dialog->colour);
 
 	button = gtk_button_new_with_label (_("Add"));
 	gtk_box_pack_start(GTK_BOX(gtk_dialog_get_action_area(GTK_DIALOG(dialog->window))), button,
@@ -543,7 +538,7 @@ static void find_next_cb(GtkButton *button, FindDialog *dialog)
 	dialog->auto_highlight = NULL;
 	dialog->auto_highlight = gtk_hex_insert_autohighlight(gh, str, str_len, "red");
 	if(hex_document_find_forward(gh->document,
-								 gh->cursor_pos+1, str, str_len, &offset))
+								 gh->cursor_pos+1, (guchar *) str, str_len, &offset))
 	{
 		gtk_hex_set_cursor(gh, offset);
 	}
@@ -578,7 +573,7 @@ static void find_prev_cb(GtkButton *button, FindDialog *dialog)
 	dialog->auto_highlight = NULL;
 	dialog->auto_highlight = gtk_hex_insert_autohighlight(gh, str, str_len, "red");
 	if(hex_document_find_backward(gh->document,
-								  gh->cursor_pos, str, str_len, &offset))
+								  gh->cursor_pos, (guchar *) str, str_len, &offset))
 		gtk_hex_set_cursor(gh, offset);
 	else {
 		ghex_window_flash(win, _("Beginning Of File reached"));
@@ -682,7 +677,7 @@ static void replace_next_cb(GtkButton *button, gpointer unused)
 	}
 
 	if(hex_document_find_forward(gh->document,
-								 gh->cursor_pos+1, str, str_len, &offset))
+								 gh->cursor_pos+1, (guchar *) str, str_len, &offset))
 		gtk_hex_set_cursor(gh, offset);
 	else {
 		display_info_dialog(win, _("String was not found!\n"));
@@ -719,11 +714,11 @@ static void replace_one_cb(GtkButton *button, gpointer unused)
 	if(find_len > doc->file_size - gh->cursor_pos)
 		goto clean_up;
 	
-	if(hex_document_compare_data(doc, find_str, gh->cursor_pos, find_len) == 0)
+	if(hex_document_compare_data(doc, (guchar *) find_str, gh->cursor_pos, find_len) == 0)
 		hex_document_set_data(doc, gh->cursor_pos,
-							  rep_len, find_len, rep_str, TRUE);
+							  rep_len, find_len, (guchar *) rep_str, TRUE);
 	
-	if(hex_document_find_forward(doc, gh->cursor_pos + rep_len, find_str, find_len,
+	if(hex_document_find_forward(doc, gh->cursor_pos + rep_len, (guchar *) find_str, find_len,
 								 &offset))
 		gtk_hex_set_cursor(gh, offset);
 	else {
@@ -767,9 +762,9 @@ static void replace_all_cb(GtkButton *button, gpointer unused)
 	count = 0;
 	cursor_pos = 0;  
 
-	while(hex_document_find_forward(doc, cursor_pos, find_str, find_len,
+	while(hex_document_find_forward(doc, cursor_pos, (guchar *) find_str, find_len,
 									&offset)) {
-		hex_document_set_data(doc, offset, rep_len, find_len, rep_str, TRUE);
+		hex_document_set_data(doc, offset, rep_len, find_len, (guchar *) rep_str, TRUE);
 		cursor_pos = offset + rep_len;
 		count++;
 	}
@@ -823,7 +818,7 @@ static void advanced_find_add_cb(GtkButton *button, AdvancedFindDialog *dialog)
 			display_error_dialog (dialog->parent, _("No string to search for!"));
 			return;
 		}
-		gtk_color_selection_get_current_rgba (GTK_COLOR_SELECTION (dialog->addDialog->colour),
+		gtk_color_chooser_get_rgba (GTK_COLOR_CHOOSER (dialog->addDialog->colour),
 		                                      &rgba);
 		colour = gdk_rgba_to_string (&rgba);
 		data->auto_highlight = gtk_hex_insert_autohighlight(gh, data->str, data->str_len, colour);
@@ -871,7 +866,7 @@ static void advanced_find_next_cb(GtkButton *button, AdvancedFindDialog *dialog)
 	
 	gtk_tree_model_get(model, &iter, 2, &data, -1);
 	if(hex_document_find_forward(gh->document,
-								 gh->cursor_pos+1, data->str, data->str_len, &offset))
+								 gh->cursor_pos+1, (guchar *) data->str, data->str_len, &offset))
 	{
 		gtk_hex_set_cursor(gh, offset);
 	}
@@ -896,7 +891,7 @@ static void advanced_find_prev_cb(GtkButton *button, AdvancedFindDialog *dialog)
 	
 	gtk_tree_model_get(model, &iter, 2, &data, -1);
 	if(hex_document_find_backward(gh->document,
-								  gh->cursor_pos, data->str, data->str_len, &offset))
+								  gh->cursor_pos, (guchar *) data->str, data->str_len, &offset))
 		gtk_hex_set_cursor(gh, offset);
 	else {
 		ghex_window_flash(win, _("Beginning Of File reached"));

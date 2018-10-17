@@ -29,11 +29,9 @@
 #include "ghex-window.h"
 
 /* Command line options */
-static gchar *geometry = NULL;
 static gchar **args_remaining = NULL;
 
 static GOptionEntry options[] = {
-        { "geometry", 'g', 0, G_OPTION_ARG_STRING, &geometry, N_("X geometry specification (see \"X\" man page)."), N_("GEOMETRY") },
         { G_OPTION_REMAINING, 0, 0, G_OPTION_ARG_FILENAME_ARRAY, &args_remaining, NULL, N_("FILES") },
         { NULL }
 };
@@ -168,11 +166,6 @@ main(int argc, char **argv)
 			if (g_file_test (*filename, G_FILE_TEST_EXISTS)) {
 				win = ghex_window_new_from_file (application, *filename);
 				if(win != NULL) {
-					if(geometry) {
-						if(!gtk_window_parse_geometry(GTK_WINDOW(win), geometry))
-							g_warning(_("Invalid geometry string \"%s\"\n"), geometry);
-						geometry = NULL;
-					}
 					gtk_widget_show(win);
 				}
 			}
@@ -181,11 +174,6 @@ main(int argc, char **argv)
 
 	if(ghex_window_get_list() == NULL) {
 		win = ghex_window_new (application);
-		if(geometry) {
-			if(!gtk_window_parse_geometry(GTK_WINDOW(win), geometry))
-				g_warning(_("Invalid geometry string \"%s\"\n"), geometry);
-			geometry = NULL;
-		}
 		gtk_widget_show(win);
 	}
 	else win = GTK_WIDGET(ghex_window_get_list()->data);
