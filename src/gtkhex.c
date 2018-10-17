@@ -568,7 +568,7 @@ render_ascii_highlights (GtkHex *gh,
 			sl = curHighlight->start_line;
 			el = curHighlight->end_line;
 
-			get_highlight_colour (gh->xdisp, curHighlight, &bg_color);
+			get_highlight_colour (gh->adisp, curHighlight, &bg_color);
 			gdk_cairo_set_source_rgba (cr, &bg_color);
 
 			if (cursor_line == sl)
