@@ -105,29 +105,28 @@ FindDialog *create_find_dialog()
 	gtk_widget_show(frame);
 	gtk_widget_show(dialog->f_gh);
 	
-	dialog->f_next = gtk_button_new_with_label (_("Find Next"));
+	dialog->f_next = gtk_dialog_add_button (GTK_DIALOG (dialog->window),
+											_("Find Next"),
+											GTK_RESPONSE_APPLY);
 	g_signal_connect (G_OBJECT (dialog->f_next), "clicked",
 					  G_CALLBACK(find_next_cb), dialog);
-	gtk_box_pack_start(GTK_BOX(gtk_dialog_get_action_area(GTK_DIALOG(dialog->window))), dialog->f_next,
-					   TRUE, TRUE, 0);
 	gtk_widget_set_can_default(dialog->f_next, TRUE);
 	gtk_widget_show(dialog->f_next);
-	dialog->f_prev = gtk_button_new_with_label (_("Find Previous"));
+
+	dialog->f_prev = gtk_dialog_add_button (GTK_DIALOG (dialog->window),
+											_("Find Previous"),
+											GTK_RESPONSE_APPLY);
 	g_signal_connect (G_OBJECT (dialog->f_prev), "clicked",
 					  G_CALLBACK(find_prev_cb), dialog);
-	gtk_box_pack_start(GTK_BOX(gtk_dialog_get_action_area(GTK_DIALOG(dialog->window))), dialog->f_prev,
-					   TRUE, TRUE, 0);
-
 	gtk_widget_set_can_default(dialog->f_prev, TRUE);
 	gtk_widget_show(dialog->f_prev);
 
-	dialog->f_close = gtk_button_new_with_label (_("Cancel"));
+	dialog->f_close = gtk_dialog_add_button (GTK_DIALOG (dialog->window),
+											 _("Cancel"),
+											 GTK_RESPONSE_CLOSE);
 	g_signal_connect (G_OBJECT (dialog->f_close),
 					  "clicked", G_CALLBACK(find_cancel_cb),
 					  dialog);
-	gtk_box_pack_start(GTK_BOX(gtk_dialog_get_action_area(GTK_DIALOG(dialog->window))), dialog->f_close,
-					   TRUE, TRUE, 0);
-
 	gtk_widget_set_can_default(dialog->f_close, TRUE);
 	gtk_widget_show(dialog->f_close);
 
@@ -171,21 +170,21 @@ static AdvancedFind_AddDialog *create_advanced_find_add_dialog(AdvancedFindDialo
 					    dialog->colour, FALSE, FALSE, 8);
 	gtk_widget_show (dialog->colour);
 
-	button = gtk_button_new_with_label (_("Add"));
-	gtk_box_pack_start(GTK_BOX(gtk_dialog_get_action_area(GTK_DIALOG(dialog->window))), button,
-					   TRUE, TRUE, 0);
+	button = gtk_dialog_add_button (GTK_DIALOG (dialog->window),
+									_("Add"),
+									GTK_RESPONSE_OK);
 	g_signal_connect (G_OBJECT (button),
 					  "clicked", G_CALLBACK(advanced_find_add_add_cb),
 					  dialog);
 	gtk_widget_set_can_default(button, TRUE);
 	gtk_widget_show(button);
 
-	button = gtk_button_new_with_label (_("Cancel"));
+	button = gtk_dialog_add_button (GTK_DIALOG (dialog->window),
+									_("Cancel"),
+									GTK_RESPONSE_CANCEL);
 	g_signal_connect (G_OBJECT (button),
 					  "clicked", G_CALLBACK(cancel_cb),
 					  dialog->window);
-	gtk_box_pack_start(GTK_BOX(gtk_dialog_get_action_area(GTK_DIALOG(dialog->window))), button,
-					   TRUE, TRUE, 0);
 	gtk_widget_set_can_default(button, TRUE);
 	gtk_widget_show(button);
 
@@ -290,12 +289,12 @@ AdvancedFindDialog *create_advanced_find_dialog(GHexWindow *parent)
 	gtk_widget_set_can_default(dialog->f_remove, TRUE);
 	gtk_widget_show(dialog->f_remove);
 
-	dialog->f_close = gtk_button_new_with_label (_("Close"));
+	dialog->f_close = gtk_dialog_add_button (GTK_DIALOG (dialog->window),
+											 _("Close"),
+											 GTK_RESPONSE_CLOSE);
 	g_signal_connect(G_OBJECT(dialog->f_close),
 					 "clicked", G_CALLBACK(advanced_find_close_cb),
 					 dialog);
-	gtk_box_pack_start(GTK_BOX(gtk_dialog_get_action_area(GTK_DIALOG(dialog->window))),
-					   dialog->f_close, TRUE, TRUE, 0);
 	gtk_widget_set_can_default(dialog->f_close, TRUE);
 	gtk_widget_show(dialog->f_close);
 
@@ -367,37 +366,39 @@ ReplaceDialog *create_replace_dialog()
 	gtk_widget_show(frame);
 	gtk_widget_show(dialog->r_gh);
 	
-	dialog->next = gtk_button_new_with_label (_("Find next"));
+	dialog->next = gtk_dialog_add_button (GTK_DIALOG (dialog->window),
+										  _("Find next"),
+										  GTK_RESPONSE_APPLY);
 	g_signal_connect (G_OBJECT (dialog->next),
 					  "clicked", G_CALLBACK(replace_next_cb),
 					  NULL);
-	gtk_box_pack_start(GTK_BOX(gtk_dialog_get_action_area(GTK_DIALOG(dialog->window))), dialog->next,
-					   TRUE, TRUE, 0);
 	gtk_widget_set_can_default(dialog->next, TRUE);
 	gtk_widget_show(dialog->next);
-	dialog->replace = gtk_button_new_with_mnemonic(_("Replace"));
+
+	dialog->replace = gtk_dialog_add_button (GTK_DIALOG (dialog->window),
+											 _("Replace"),
+											 GTK_RESPONSE_APPLY);
 	g_signal_connect (G_OBJECT (dialog->replace),
 					  "clicked", G_CALLBACK(replace_one_cb),
 					  NULL);
-	gtk_box_pack_start(GTK_BOX(gtk_dialog_get_action_area(GTK_DIALOG(dialog->window))), dialog->replace,
-					   TRUE, TRUE, 0);
 	gtk_widget_set_can_default(dialog->replace, TRUE);
 	gtk_widget_show(dialog->replace);
-	dialog->replace_all= gtk_button_new_with_mnemonic(_("Replace _All"));
+
+	dialog->replace_all= gtk_dialog_add_button (GTK_DIALOG (dialog->window),
+												_("Replace _All"),
+												GTK_RESPONSE_APPLY);
 	g_signal_connect (G_OBJECT (dialog->replace_all),
 					  "clicked", G_CALLBACK(replace_all_cb),
 					  NULL);
-	gtk_box_pack_start(GTK_BOX(gtk_dialog_get_action_area(GTK_DIALOG(dialog->window))), dialog->replace_all,
-					   TRUE, TRUE, 0);
 	gtk_widget_set_can_default(dialog->replace_all, TRUE);
 	gtk_widget_show(dialog->replace_all);
 
-	dialog->close = gtk_button_new_with_label (_("Cancel"));
+	dialog->close = gtk_dialog_add_button (GTK_DIALOG (dialog->window),
+										  _("Cancel"),
+										  GTK_RESPONSE_CANCEL);
 	g_signal_connect (G_OBJECT (dialog->close),
 					  "clicked", G_CALLBACK(cancel_cb),
 					  dialog->window);
-	gtk_box_pack_start(GTK_BOX(gtk_dialog_get_action_area(GTK_DIALOG(dialog->window))), dialog->close,
-					   TRUE, TRUE, 0);
 	gtk_widget_set_can_default(dialog->close, TRUE);
 	gtk_widget_show(dialog->close);
 	
@@ -436,21 +437,21 @@ JumpDialog *create_jump_dialog()
 	                          GTK_WINDOW (dialog->window));
 	gtk_widget_show(dialog->int_entry);
 
-	dialog->ok = gtk_button_new_with_label (_("Goto"));
+	dialog->ok = gtk_dialog_add_button (GTK_DIALOG (dialog->window),
+										_("Goto"),
+										GTK_RESPONSE_APPLY);
 	g_signal_connect (G_OBJECT (dialog->ok),
 					  "clicked", G_CALLBACK(goto_byte_cb),
 					  dialog->int_entry);
-	gtk_box_pack_start(GTK_BOX(gtk_dialog_get_action_area(GTK_DIALOG(dialog->window))), dialog->ok,
-					   TRUE, TRUE, 0);
 
 	gtk_widget_set_can_default(dialog->ok, TRUE);
 	gtk_widget_show(dialog->ok);
-	dialog->cancel = gtk_button_new_with_label (_("Cancel"));
+	dialog->cancel = gtk_dialog_add_button (GTK_DIALOG (dialog->window),
+											_("Cancel"),
+											GTK_RESPONSE_CANCEL);
 	g_signal_connect (G_OBJECT (dialog->cancel),
 					  "clicked", G_CALLBACK(cancel_cb),
 					  dialog->window);
-	gtk_box_pack_start(GTK_BOX(gtk_dialog_get_action_area(GTK_DIALOG(dialog->window))), dialog->cancel,
-					   TRUE, TRUE, 0);
 
 	gtk_widget_set_can_default(dialog->cancel, TRUE);
 	gtk_widget_show(dialog->cancel);

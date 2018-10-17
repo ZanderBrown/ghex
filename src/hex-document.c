@@ -1015,11 +1015,11 @@ hex_document_real_undo(HexDocument *doc)
 	case HEX_CHANGE_STRING:
 		len = cd->end - cd->start + 1;
 		rep_data = hex_document_get_data(doc, cd->start, len);
-		hex_document_set_data(doc, cd->start, cd->rep_len, len, cd->v_string, FALSE);
+		hex_document_set_data(doc, cd->start, cd->rep_len, len, (guchar *) cd->v_string, FALSE);
 		g_free(cd->v_string);
 		cd->end = cd->start + cd->rep_len - 1;
 		cd->rep_len = len;
-		cd->v_string = rep_data;
+		cd->v_string = (gchar *) rep_data;
 		break;
 	}
 
@@ -1077,11 +1077,11 @@ hex_document_real_redo(HexDocument *doc)
 	case HEX_CHANGE_STRING:
 		len = cd->end - cd->start + 1;
 		rep_data = hex_document_get_data(doc, cd->start, len);
-		hex_document_set_data(doc, cd->start, cd->rep_len, len, cd->v_string, FALSE);
+		hex_document_set_data(doc, cd->start, cd->rep_len, len, (guchar *) cd->v_string, FALSE);
 		g_free(cd->v_string);
 		cd->end = cd->start + cd->rep_len - 1;
 		cd->rep_len = len;
-		cd->v_string = rep_data;
+		cd->v_string = (gchar *) rep_data;
 		break;
 	}
 
