@@ -138,7 +138,8 @@ static void create_dialog_prop(HexDialogEntryTypes type,
     GtkWidget *label;
 
     label = gtk_label_new(_(HexDialogEntries[type].name));
-    gtk_misc_set_alignment (GTK_MISC(label), 1.0, 0.5);
+    gtk_label_set_xalign (GTK_LABEL (label), 1.0);
+    gtk_label_set_yalign (GTK_LABEL (label), 0.5);
     gtk_widget_set_hexpand (label, TRUE);
     gtk_grid_attach (GTK_GRID (grid), label,
                      xpos, ypos, 1, 1);
@@ -225,7 +226,8 @@ GtkWidget *hex_dialog_getview(HexDialog *dialog)
     gtk_box_pack_start(GTK_BOX(hbox), dialog->config_hex, TRUE, FALSE, 4);
 
     label = gtk_label_new(_("Stream Length:"));
-    gtk_misc_set_alignment (GTK_MISC (label), 1.0, 0.5);
+    gtk_label_set_xalign (GTK_LABEL (label), 1.0);
+    gtk_label_set_yalign (GTK_LABEL (label), 0.5);
     gtk_grid_attach (GTK_GRID (grid), label, 4, 3, 1, 1);
     gtk_widget_show(label);
 

@@ -130,7 +130,8 @@ create_converter_entry(const gchar *name, GtkWidget *grid,
 
 	/* label */
 	label = gtk_label_new_with_mnemonic(name);
-	gtk_misc_set_alignment(GTK_MISC(label), 0.0, 0.5);
+	gtk_label_set_xalign (GTK_LABEL (label), 0.0);
+	gtk_label_set_yalign (GTK_LABEL (label), 0.5);
 	gtk_grid_attach (GTK_GRID (grid), label, 0, pos, 1, 1);
 #if 0
 	accel_key = gtk_label_parse_uline(GTK_LABEL(label), name);
@@ -174,7 +175,8 @@ create_converter_button(const gchar *name, GtkAccelGroup *accel_group)
 
 	button = gtk_button_new();
     label = gtk_label_new_with_mnemonic(name);
-	gtk_misc_set_alignment(GTK_MISC(label), 0.5, 0.5);
+	gtk_label_set_xalign (GTK_LABEL (label), 0.5);
+	gtk_label_set_yalign (GTK_LABEL (label), 0.5);
 #if 0
 	accel_key = gtk_label_parse_uline(GTK_LABEL(label), name);
 #endif /* 0/1 */

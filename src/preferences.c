@@ -99,7 +99,8 @@ create_prefs_dialog()
 	gtk_widget_show(box);
 
 	label = gtk_label_new_with_mnemonic(_("_Maximum number of undo levels:"));
-	gtk_misc_set_alignment(GTK_MISC(label), 0.0, 0.5);
+	gtk_label_set_xalign (GTK_LABEL (label), 0.0);
+	gtk_label_set_yalign (GTK_LABEL (label), 0.5);
 	gtk_box_pack_start (GTK_BOX(box), label, TRUE, TRUE, 8);
 	gtk_widget_show(label);
 						  
@@ -123,7 +124,8 @@ create_prefs_dialog()
 	}
 
 	label = gtk_label_new_with_mnemonic(_("_Show cursor offset in statusbar as:"));
-	gtk_misc_set_alignment(GTK_MISC(label), 0.0, 0.5);
+	gtk_label_set_xalign (GTK_LABEL (label), 0.0);
+	gtk_label_set_yalign (GTK_LABEL (label), 0.5);
 	gtk_box_pack_start (GTK_BOX(box), label, TRUE, TRUE, 8);
 	gtk_widget_show(label);
 
@@ -243,7 +245,8 @@ create_prefs_dialog()
 	gtk_widget_show (grid);
 
 	label = gtk_label_new_with_mnemonic(_("_Data font:"));
-	gtk_misc_set_alignment(GTK_MISC(label), 0.0, 0.5);
+	gtk_label_set_xalign (GTK_LABEL (label), 0.0);
+	gtk_label_set_yalign (GTK_LABEL (label), 0.5);
 	gtk_widget_show(label);
 	gtk_container_add (GTK_CONTAINER (grid), label);
 
@@ -266,7 +269,8 @@ create_prefs_dialog()
 	                         GTK_POS_RIGHT, 1, 1);
 
 	label = gtk_label_new_with_mnemonic(_("Header fo_nt:"));
-	gtk_misc_set_alignment(GTK_MISC(label), 0.0, 0.5);
+	gtk_label_set_xalign (GTK_LABEL (label), 0.0);
+	gtk_label_set_yalign (GTK_LABEL (label), 0.5);
 	gtk_widget_show(label);
 	gtk_container_add (GTK_CONTAINER (grid), label);
 	pui->hf_button = gtk_font_button_new_with_font(def_font_name);
@@ -304,7 +308,8 @@ create_prefs_dialog()
 	gtk_widget_show(box);
 
 	label = gtk_label_new_with_mnemonic(_("_Print shaded box over:"));
-	gtk_misc_set_alignment(GTK_MISC(label), 1.0, 0.5);
+	gtk_label_set_xalign (GTK_LABEL (label), 1.0);
+	gtk_label_set_yalign (GTK_LABEL (label), 0.5);
 	gtk_box_pack_start (GTK_BOX(box), label, TRUE, TRUE, 4);
 	gtk_widget_show(label);
 						  
@@ -320,7 +325,8 @@ create_prefs_dialog()
 	}
 
 	label = gtk_label_new(_("lines (0 for no box)"));
-	gtk_misc_set_alignment(GTK_MISC(label), 0.0, 0.5);
+	gtk_label_set_xalign (GTK_LABEL (label), 0.0);
+	gtk_label_set_yalign (GTK_LABEL (label), 0.5);
 	gtk_box_pack_start (GTK_BOX(box), label, FALSE, TRUE, 4);
 	gtk_widget_show(label);
 
