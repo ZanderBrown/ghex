@@ -79,7 +79,7 @@ endforeach
 
 atk_dep = dependency('atk', version: '>= 1.0.0')
 gio_dep = dependency('gio-2.0', version: '>= 2.31.10')
-gtk_dep = dependency('gtk+-3.0', version: '>= 3.3.8')
+gtk_dep = dependency('gtk+-3.0', version: '>= 3.20.0')
 gail_dep = dependency('gail-3.0', version: '>= 1.0.0')
 
 configure_file(

@@ -88,6 +88,7 @@ struct _GtkHex
 
 	PangoFontMetrics *disp_font_metrics;
 	PangoFontDescription *font_desc;
+	GtkCssProvider *font_provider;
 
 	gint active_view;
 	

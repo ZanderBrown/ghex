@@ -39,6 +39,7 @@
 #define SCROLL_TIMEOUT 100
 
 #define DEFAULT_FONT "Monospace 12"
+#define FONT_CSS "hex-editor { font-family: %s; font-size: %ipt; }"
 
 #define is_displayable(c) (((c) >= 0x20) && ((c) < 0x7f))
 
@@ -324,42 +325,41 @@ static void
 render_ac (GtkHex *gh,
            cairo_t *cr)
 {
-	GdkRGBA bg_color;
 	GdkRGBA fg_color;
 	GtkStateFlags state;
 	GtkStyleContext *context;
 	gint cx, cy;
-	static guchar c[2] = "\0\0";
-	
+	static gchar c[2] = "\0\0";
+
 	if(!gtk_widget_get_realized(gh->adisp))
 		return;
 
 	context = gtk_widget_get_style_context (gh->adisp);
 	state = gtk_widget_get_state_flags (gh->adisp);
-	state |= GTK_STATE_FLAG_SELECTED;
 
 	if(get_acoords(gh, gh->cursor_pos, &cx, &cy)) {
 		c[0] = gtk_hex_get_byte(gh, gh->cursor_pos);
 		if(!is_displayable(c[0]))
 			c[0] = '.';
 
-		gtk_style_context_get_background_color (context, state, &bg_color);
-		gdk_cairo_set_source_rgba (cr, &bg_color);
-
 		if(gh->active_view == VIEW_ASCII) {
-			cairo_rectangle (cr, cx, cy, gh->char_width, gh->char_height - 1);
-			cairo_fill (cr);
+			gtk_widget_set_state_flags (gh->adisp, GTK_STATE_FLAG_SELECTED, FALSE);
+			context = gtk_widget_get_style_context (gh->adisp);
+			state = gtk_widget_get_state_flags (gh->adisp);
+			gtk_render_background (context, cr, cx, cy,
+								   gh->char_width, gh->char_height - 1);
 			gtk_style_context_get_color (context, state, &fg_color);
-		}
-		else {
+			gtk_widget_unset_state_flags (gh->adisp, GTK_STATE_FLAG_SELECTED);
+		} else {
+			gtk_style_context_get_color (context, state, &fg_color);
+			gdk_cairo_set_source_rgba (cr, &fg_color);
 			cairo_set_line_width (cr, 1.0);
 			cairo_rectangle (cr, cx + 0.5, cy + 0.5, gh->char_width, gh->char_height - 1);
 			cairo_stroke (cr);
-			gtk_style_context_get_color (context, state & ~GTK_STATE_FLAG_SELECTED, &fg_color);
 		}
 		gdk_cairo_set_source_rgba (cr, &fg_color);
 		cairo_move_to (cr, cx, cy);
-		pango_layout_set_text (gh->alayout, c, 1);
+		pango_layout_set_text (gh->alayout, (char *) c, 1);
 		pango_cairo_show_layout (cr, gh->alayout);
 	}
 }
@@ -368,44 +368,43 @@ static void
 render_xc (GtkHex *gh,
            cairo_t *cr)
 {
-	GdkRGBA bg_color;
 	GdkRGBA fg_color;
 	GtkStateFlags state;
 	GtkStyleContext *context;
 	gint cx, cy, i;
-	static guchar c[2];
+	static gchar c[2];
 
 	if(!gtk_widget_get_realized(gh->xdisp))
 		return;
 
 	context = gtk_widget_get_style_context (gh->xdisp);
 	state = gtk_widget_get_state_flags (gh->xdisp);
-	state |= GTK_STATE_FLAG_SELECTED;
 
 	if(get_xcoords(gh, gh->cursor_pos, &cx, &cy)) {
 		format_xbyte(gh, gh->cursor_pos, c);
 		if(gh->lower_nibble) {
 			cx += gh->char_width;
 			i = 1;
-		}
-		else {
+		} else {
 			c[1] = 0;
 			i = 0;
 		}
 
-		gtk_style_context_get_background_color (context, state, &bg_color);
-		gdk_cairo_set_source_rgba (cr, &bg_color);
-
 		if(gh->active_view == VIEW_HEX) {
-			cairo_rectangle (cr, cx, cy, gh->char_width, gh->char_height - 1);
-			cairo_fill (cr);
+			gtk_widget_set_state_flags (gh->xdisp, GTK_STATE_FLAG_SELECTED, FALSE);
+			context = gtk_widget_get_style_context (gh->xdisp);
+			state = gtk_widget_get_state_flags (gh->xdisp);
+			gtk_render_background (context, cr, cx, cy,
+								   gh->char_width, gh->char_height - 1);
 			gtk_style_context_get_color (context, state, &fg_color);
-		}
-		else {
+			gtk_widget_unset_state_flags (gh->xdisp, GTK_STATE_FLAG_SELECTED);
+			context = gtk_widget_get_style_context (gh->xdisp);
+		} else {
+			gtk_style_context_get_color (context, state, &fg_color);
+			gdk_cairo_set_source_rgba (cr, &fg_color);
 			cairo_set_line_width (cr, 1.0);
 			cairo_rectangle (cr, cx + 0.5, cy + 0.5, gh->char_width, gh->char_height - 1);
 			cairo_stroke (cr);
-			gtk_style_context_get_color (context, state & ~GTK_STATE_FLAG_SELECTED, &fg_color);
 		}
 		gdk_cairo_set_source_rgba (cr, &fg_color);
 		cairo_move_to (cr, cx, cy);
@@ -434,6 +433,29 @@ static void hide_cursor(GtkHex *gh) {
 	}
 }
 
+void
+get_highlight_colour (GtkWidget        *widget,
+                      GtkHex_Highlight *hlight,
+                      GdkRGBA          *colour)
+{
+	GdkRGBA         *c;
+	GtkStyleContext *context;
+	GtkStateFlags    state;
+
+	if (hlight && hlight->bg_color) {
+		*colour = *hlight->bg_color;
+		return;
+	}
+
+	context = gtk_widget_get_style_context (widget);
+	state = gtk_widget_get_state_flags (widget);
+	gtk_style_context_get (context, state, "background-color", &c, NULL);
+
+	*colour = *c;
+	gdk_rgba_free (c);
+}
+
+
 static void
 render_hex_highlights (GtkHex *gh,
                        cairo_t *cr,
@@ -444,15 +466,8 @@ render_hex_highlights (GtkHex *gh,
 	   /* would be nice if we could cache that */
 
 	GtkHex_AutoHighlight *nextList = gh->auto_highlight;
-	GtkStateFlags state;
-	GtkStyleContext *context;
 
-	context = gtk_widget_get_style_context (gh->xdisp);
-	state = gtk_widget_get_state_flags (gh->xdisp);
-
-	gtk_style_context_save (context);
-	state |= GTK_STATE_FLAG_SELECTED;
-	gtk_style_context_set_state (context, state);
+	gtk_widget_set_state_flags (gh->xdisp, GTK_STATE_FLAG_SELECTED, FALSE);
 
 	cairo_save (cr);
 
@@ -473,12 +488,9 @@ render_hex_highlights (GtkHex *gh,
 			sl = curHighlight->start_line;
 			el = curHighlight->end_line;
 
-			if (curHighlight->bg_color) {
-				gdk_cairo_set_source_rgba (cr, curHighlight->bg_color);
-			} else {
-				gtk_style_context_get_background_color (context, state, &bg_color);
-				gdk_cairo_set_source_rgba (cr, &bg_color);
-			}
+			get_highlight_colour (gh->xdisp, curHighlight, &bg_color);
+			gdk_cairo_set_source_rgba (cr, &bg_color);
+
 			if (cursor_line == sl)
 			{
 				cursor_off = 2*(start%gh->cpl) + (start%gh->cpl)/gh->group_type;
@@ -489,28 +501,28 @@ render_hex_highlights (GtkHex *gh,
 				len = len - cursor_off;
 				if (len > 0)
 					cairo_rectangle (cr,
-					                 cursor_off * gh->char_width,
-					                 cursor_line * gh->char_height,
-					                 len * gh->char_width,
-					                 gh->char_height);
+									 cursor_off * gh->char_width,
+									 cursor_line * gh->char_height,
+									 len * gh->char_width,
+									 gh->char_height);
 			}
 			else if (cursor_line == el)
 			{
 				cursor_off = 2*(end%gh->cpl + 1) + (end%gh->cpl)/gh->group_type;
 				if (cursor_off > 0)
 					cairo_rectangle (cr,
-					                 0,
-					                 cursor_line * gh->char_height,
-					                 cursor_off * gh->char_width,
-					                 gh->char_height);
+									 0,
+									 cursor_line * gh->char_height,
+									 cursor_off * gh->char_width,
+									 gh->char_height);
 			}
 			else if (cursor_line > sl && cursor_line < el)
 			{
 				cairo_rectangle (cr,
-				                 0,
-				                 cursor_line * gh->char_height,
-				                 xcpl * gh->char_width,
-				                 gh->char_height);
+								 0,
+								 cursor_line * gh->char_height,
+								 xcpl * gh->char_width,
+								 gh->char_height);
 			}
 
 			cairo_fill (cr);
@@ -524,7 +536,7 @@ render_hex_highlights (GtkHex *gh,
 	}
 
 	cairo_restore (cr);
-	gtk_style_context_restore (context);
+	gtk_widget_unset_state_flags (gh->xdisp, GTK_STATE_FLAG_SELECTED);
 }
 
 static void
@@ -534,15 +546,8 @@ render_ascii_highlights (GtkHex *gh,
 {
 	GtkHex_Highlight *curHighlight = &gh->selection;
 	GtkHex_AutoHighlight *nextList = gh->auto_highlight;
-	GtkStateFlags state;
-	GtkStyleContext *context;
 
-	context = gtk_widget_get_style_context (gh->adisp);
-	state = gtk_widget_get_state_flags (gh->adisp);
-
-	gtk_style_context_save (context);
-	state |= GTK_STATE_FLAG_SELECTED;
-	gtk_style_context_set_state (context, state);
+	gtk_widget_set_state_flags (gh->adisp, GTK_STATE_FLAG_SELECTED, FALSE);
 
 	cairo_save (cr);
 
@@ -563,12 +568,9 @@ render_ascii_highlights (GtkHex *gh,
 			sl = curHighlight->start_line;
 			el = curHighlight->end_line;
 
-			if (curHighlight->bg_color) {
-				gdk_cairo_set_source_rgba (cr, curHighlight->bg_color);
-			} else {
-				gtk_style_context_get_background_color (context, state, &bg_color);
-				gdk_cairo_set_source_rgba (cr, &bg_color);
-			}
+			get_highlight_colour (gh->xdisp, curHighlight, &bg_color);
+			gdk_cairo_set_source_rgba (cr, &bg_color);
+
 			if (cursor_line == sl)
 			{
 				cursor_off = start % gh->cpl;
@@ -578,28 +580,28 @@ render_ascii_highlights (GtkHex *gh,
 					len = gh->cpl - cursor_off;
 				if (len > 0)
 					cairo_rectangle (cr,
-					                 cursor_off * gh->char_width,
-					                 cursor_line * gh->char_height,
-					                 len * gh->char_width,
-					                 gh->char_height);
+									 cursor_off * gh->char_width,
+									 cursor_line * gh->char_height,
+									 len * gh->char_width,
+									 gh->char_height);
 			}
 			else if (cursor_line == el)
 			{
 				cursor_off = end % gh->cpl + 1;
 				if (cursor_off > 0)
 					cairo_rectangle (cr,
-					                 0,
-					                 cursor_line * gh->char_height,
-					                 cursor_off * gh->char_width,
-					                 gh->char_height);
+									 0,
+									 cursor_line * gh->char_height,
+									 cursor_off * gh->char_width,
+									 gh->char_height);
 			}
 			else if (cursor_line > sl && cursor_line < el)
 			{
 				cairo_rectangle (cr,
-				                 0,
-				                 cursor_line * gh->char_height,
-				                 gh->cpl * gh->char_width,
-				                 gh->char_height);
+								 0,
+								 cursor_line * gh->char_height,
+								 gh->cpl * gh->char_width,
+								 gh->char_height);
 			}
 
 			cairo_fill (cr);
@@ -613,7 +615,7 @@ render_ascii_highlights (GtkHex *gh,
 	}
 
 	cairo_restore (cr);
-	gtk_style_context_restore (context);
+	gtk_widget_unset_state_flags (gh->adisp, GTK_STATE_FLAG_SELECTED);
 }
 
 /*
@@ -673,7 +675,6 @@ render_hex_lines (GtkHex *gh,
                   gint imax)
 {
 	GtkWidget *w = gh->xdisp;
-	GdkRGBA bg_color;
 	GdkRGBA fg_color;
 	GtkAllocation allocation;
 	GtkStateFlags state;
@@ -688,14 +689,14 @@ render_hex_lines (GtkHex *gh,
 	context = gtk_widget_get_style_context (w);
 	state = gtk_widget_get_state_flags (w);
 
-	gtk_style_context_get_background_color (context, state, &bg_color);
 	gtk_style_context_get_color (context, state, &fg_color);
 
 	cursor_line = gh->cursor_pos / gh->cpl - gh->top_line;
 
 	gtk_widget_get_allocation(w, &allocation);
-	gdk_cairo_set_source_rgba (cr, &bg_color);
-	cairo_rectangle (cr, 0, imin * gh->char_height, allocation.width, (imax - imin + 1) * gh->char_height);
+	gtk_render_background (context, cr,
+						   0, imin * gh->char_height,
+						   allocation.width, (imax - imin + 1) * gh->char_height);
 	cairo_fill (cr);
   
 	imax = MIN(imax, gh->vis_lines);
@@ -703,7 +704,7 @@ render_hex_lines (GtkHex *gh,
 
 	gdk_cairo_set_source_rgba (cr, &fg_color);
 
-	frm_len = format_xblock (gh, gh->priv->disp_buffer, (gh->top_line+imin)*gh->cpl,
+	frm_len = format_xblock (gh, (gchar *) gh->priv->disp_buffer, (gh->top_line+imin)*gh->cpl,
 							MIN((gh->top_line+imax+1)*gh->cpl, gh->document->file_size) );
 	
 	for(i = imin; i <= imax; i++) {
@@ -713,7 +714,7 @@ render_hex_lines (GtkHex *gh,
 
 		render_hex_highlights (gh, cr, i);
 		cairo_move_to (cr, 0, i * gh->char_height);
-		pango_layout_set_text (gh->xlayout, gh->priv->disp_buffer + (i - imin) * xcpl, MIN(xcpl, tmp));
+		pango_layout_set_text (gh->xlayout, (char *) gh->priv->disp_buffer + (i - imin) * xcpl, MIN(xcpl, tmp));
 		pango_cairo_show_layout (cr, gh->xlayout);
 	}
 	
@@ -728,7 +729,6 @@ render_ascii_lines (GtkHex *gh,
                     gint imax)
 {
 	GtkWidget *w = gh->adisp;
-	GdkRGBA bg_color;
 	GdkRGBA fg_color;
 	GtkAllocation allocation;
 	GtkStateFlags state;
@@ -742,14 +742,14 @@ render_ascii_lines (GtkHex *gh,
 	context = gtk_widget_get_style_context (w);
 	state = gtk_widget_get_state_flags (w);
 
-	gtk_style_context_get_background_color (context, state, &bg_color);
 	gtk_style_context_get_color (context, state, &fg_color);
 
 	cursor_line = gh->cursor_pos / gh->cpl - gh->top_line;
 
 	gtk_widget_get_allocation(w, &allocation);
-	gdk_cairo_set_source_rgba (cr, &bg_color);
-	cairo_rectangle (cr, 0, imin * gh->char_height, allocation.width, (imax - imin + 1) * gh->char_height);
+	gtk_render_background (context, cr,
+						   0, imin * gh->char_height,
+						   allocation.width, (imax - imin + 1) * gh->char_height);
 	cairo_fill (cr);
 	
 	imax = MIN(imax, gh->vis_lines);
@@ -757,7 +757,7 @@ render_ascii_lines (GtkHex *gh,
 
 	gdk_cairo_set_source_rgba (cr, &fg_color);
 	
-	frm_len = format_ablock (gh, gh->priv->disp_buffer, (gh->top_line+imin)*gh->cpl,
+	frm_len = format_ablock (gh, (gchar *) gh->priv->disp_buffer, (gh->top_line+imin)*gh->cpl,
 							MIN((gh->top_line+imax+1)*gh->cpl, gh->document->file_size) );
 	
 	for(i = imin; i <= imax; i++) {
@@ -768,7 +768,7 @@ render_ascii_lines (GtkHex *gh,
 		render_ascii_highlights (gh, cr, i);
 
 		cairo_move_to (cr, 0, i * gh->char_height);
-		pango_layout_set_text (gh->alayout, gh->priv->disp_buffer + (i - imin)*gh->cpl, MIN(gh->cpl, tmp));
+		pango_layout_set_text (gh->alayout, (gchar *) gh->priv->disp_buffer + (i - imin)*gh->cpl, MIN(gh->cpl, tmp));
 		pango_cairo_show_layout (cr, gh->alayout);
 	}
 	
@@ -783,7 +783,6 @@ render_offsets (GtkHex *gh,
                 gint imax)
 {
 	GtkWidget *w = gh->offsets;
-	GdkRGBA bg_color;
 	GdkRGBA fg_color;
 	GtkAllocation allocation;
 	GtkStateFlags state;
@@ -797,12 +796,12 @@ render_offsets (GtkHex *gh,
 	context = gtk_widget_get_style_context (w);
 	state = gtk_widget_get_state_flags (w);
 
-	gtk_style_context_get_background_color (context, state, &bg_color);
 	gtk_style_context_get_color (context, state, &fg_color);
 
 	gtk_widget_get_allocation(w, &allocation);
-	gdk_cairo_set_source_rgba (cr, &bg_color);
-	cairo_rectangle (cr, 0, imin * gh->char_height, allocation.width, (imax - imin + 1) * gh->char_height);
+	gtk_render_background (context, cr, 0,
+						   imin * gh->char_height,
+						   allocation.width, (imax - imin + 1) * gh->char_height);
 	cairo_fill (cr);
   
 	imax = MIN(imax, gh->vis_lines);
@@ -889,13 +888,13 @@ draw_shadow (GtkWidget *widget,
              cairo_t *cr)
 {
 	GtkHex *gh = GTK_HEX(widget);
-	GtkRequisition sb_req;
 	GtkAllocation allocation;
 	GtkBorder padding;
 	GtkStateFlags state;
 	GtkStyleContext *context;
-	gint border = gtk_container_get_border_width(GTK_CONTAINER(widget));
 	gint x;
+	gint sb_width;
+	gint border = gtk_container_get_border_width(GTK_CONTAINER(widget));
 
 	context = gtk_widget_get_style_context (widget);
 	state = gtk_widget_get_state_flags (widget);
@@ -921,12 +920,12 @@ draw_shadow (GtkWidget *widget,
 	                  allocation.height - 2 * border);
 
 	/* Draw a frame around the ascii display + scrollbar */
-	gtk_widget_get_requisition(gh->scrollbar, &sb_req);
+	gtk_widget_get_preferred_width (gh->scrollbar, NULL, &sb_width);
 	gtk_render_frame (context,
 	                  cr,
-	                  allocation.width - border - gh->adisp_width - sb_req.width - padding.left - padding.right,
+	                  allocation.width - border - gh->adisp_width - sb_width - padding.left - padding.right,
 	                  border,
-	                  gh->adisp_width + sb_req.width + padding.left + padding.right,
+	                  gh->adisp_width + sb_width + padding.left + padding.right,
 	                  allocation.height - 2 * border);
 }
 
@@ -1124,7 +1123,7 @@ static void hex_button_cb(GtkWidget *w, GdkEventButton *event, GtkHex *gh) {
 		text = gtk_clipboard_wait_for_text(klass->primary);
 		if(text) {
 			hex_document_set_data(gh->document, gh->cursor_pos,
-								  strlen(text), 0, text, TRUE);
+								  strlen(text), 0, (guchar *)  text, TRUE);
 			gtk_hex_set_cursor(gh, gh->cursor_pos + strlen(text));
 			g_free(text);
 		}
@@ -1135,15 +1134,15 @@ static void hex_button_cb(GtkWidget *w, GdkEventButton *event, GtkHex *gh) {
 }
 
 static void hex_motion_cb(GtkWidget *w, GdkEventMotion *event, GtkHex *gh) {
-	GtkAllocation allocation;
-	GdkDeviceManager *device_manager;
-	GdkDevice *pointer;
-	gint x, y;
+	GtkAllocation  allocation;
+	GdkSeat       *seat;
+	GdkDevice     *pointer;
+	gint           x, y;
 
 	gtk_widget_get_allocation(w, &allocation);
 
-	device_manager = gdk_display_get_device_manager (gtk_widget_get_display (w));
-	pointer = gdk_device_manager_get_client_pointer (device_manager);
+	seat = gdk_display_get_default_seat (gtk_widget_get_display (w));
+	pointer = gdk_seat_get_pointer (seat);
 	gdk_window_get_device_position (gtk_widget_get_window (w), pointer, &x, &y, NULL);
 
 	if(y < 0)
@@ -1221,7 +1220,7 @@ static void ascii_button_cb(GtkWidget *w, GdkEventButton *event, GtkHex *gh) {
 		text = gtk_clipboard_wait_for_text(klass->primary);
 		if(text) {
 			hex_document_set_data(gh->document, gh->cursor_pos,
-								  strlen(text), 0, text, TRUE);
+								  strlen(text), 0, (guchar *) text, TRUE);
 			gtk_hex_set_cursor(gh, gh->cursor_pos + strlen(text));
 			g_free(text);
 		}
@@ -1232,15 +1231,15 @@ static void ascii_button_cb(GtkWidget *w, GdkEventButton *event, GtkHex *gh) {
 }
 
 static void ascii_motion_cb(GtkWidget *w, GdkEventMotion *event, GtkHex *gh) {
-	GtkAllocation allocation;
-	GdkDeviceManager *device_manager;
-	GdkDevice *pointer;
-	gint x, y;
+	GtkAllocation  allocation;
+	GdkSeat       *seat;
+	GdkDevice     *pointer;
+	gint           x, y;
 
 	gtk_widget_get_allocation(w, &allocation);
 
-	device_manager = gdk_display_get_device_manager (gtk_widget_get_display (w));
-	pointer = gdk_device_manager_get_client_pointer (device_manager);
+	seat = gdk_display_get_default_seat (gtk_widget_get_display (w));
+	pointer = gdk_seat_get_pointer (seat);
 	gdk_window_get_device_position (gtk_widget_get_window (w), pointer, &x, &y, NULL);
 
 	if(y < 0)
@@ -1277,9 +1276,6 @@ static void show_offsets_widget(GtkHex *gh) {
 
 	gh->offsets = gtk_drawing_area_new();
 
-	/* Modify the font for the widget */
-	gtk_widget_modify_font (gh->offsets, gh->font_desc);
- 
 	/* Create the pango layout for the widget */
 	gh->olayout = gtk_widget_create_pango_layout (gh->offsets, "");
 
@@ -1389,7 +1385,7 @@ static void primary_get_cb(GtkClipboard *clipboard,
  
 		text = hex_document_get_data(gh->document, start_pos,
 									 end_pos - start_pos);
-		gtk_selection_data_set_text(data, text, end_pos - start_pos);
+		gtk_selection_data_set_text(data, (gchar *) text, end_pos - start_pos);
 		g_free(text);
 	}
 }
@@ -1696,7 +1692,7 @@ static void gtk_hex_real_copy_to_clipboard(GtkHex *gh)
 	if(start_pos != end_pos) {
 		guchar *text = hex_document_get_data(gh->document, start_pos,
 											 end_pos - start_pos);
-		gtk_clipboard_set_text(klass->clipboard, text, end_pos - start_pos);
+		gtk_clipboard_set_text(klass->clipboard, (gchar *) text, end_pos - start_pos);
 		g_free(text);
 	}
 }
@@ -1717,7 +1713,7 @@ static void gtk_hex_real_paste_from_clipboard(GtkHex *gh)
 	text = gtk_clipboard_wait_for_text(klass->clipboard);
 	if(text) {
 		hex_document_set_data(gh->document, gh->cursor_pos,
-							  strlen(text), 0, text, TRUE);
+							  strlen(text), 0, (guchar *) text, TRUE);
 		gtk_hex_set_cursor(gh, gh->cursor_pos + strlen(text));
 		g_free(text);
 	}
@@ -1943,10 +1939,10 @@ static void gtk_hex_size_allocate(GtkWidget *w, GtkAllocation *alloc) {
 	GtkHex *gh;
 	GtkAllocation my_alloc;
 	GtkBorder padding;
-	GtkRequisition sb_req;
 	GtkStateFlags state;
 	GtkStyleContext *context;
 	gint border_width;
+	gint sb_width;
 
 	gh = GTK_HEX(w);
 	hide_cursor(gh);
@@ -1977,13 +1973,13 @@ static void gtk_hex_size_allocate(GtkWidget *w, GtkAllocation *alloc) {
 		my_alloc.x += padding.left + padding.right + my_alloc.width + gh->extra_width/2;
 	}
 
-	gtk_widget_get_requisition(gh->scrollbar, &sb_req);
+	gtk_widget_get_preferred_width (gh->scrollbar, NULL, &sb_width);
 
 	my_alloc.width = gh->xdisp_width;
 	gtk_widget_size_allocate(gh->xdisp, &my_alloc);
-	my_alloc.x = alloc->width - border_width - sb_req.width;
+	my_alloc.x = alloc->width - border_width - sb_width;
 	my_alloc.y = border_width;
-	my_alloc.width = sb_req.width;
+	my_alloc.width = sb_width;
 	my_alloc.height = MAX(alloc->height - 2*border_width, 1);
 	gtk_widget_size_allocate(gh->scrollbar, &my_alloc);
 	my_alloc.x -= gh->adisp_width + padding.left;
@@ -2017,17 +2013,17 @@ static void gtk_hex_document_changed(HexDocument* doc, gpointer change_data,
 static void gtk_hex_size_request(GtkWidget *w, GtkRequisition *req) {
 	GtkBorder padding;
 	GtkHex *gh = GTK_HEX(w);
-	GtkRequisition sb_req;
 	GtkStateFlags state;
 	GtkStyleContext *context;
+	gint sb_width;
 
 	context = gtk_widget_get_style_context (w);
 	state = gtk_widget_get_state_flags (w);
 	gtk_style_context_get_padding (context, state, &padding);
 
-	gtk_widget_get_preferred_size (gh->scrollbar, &sb_req, NULL);
+	gtk_widget_get_preferred_width (gh->scrollbar, NULL, &sb_width);
 	req->width = 2 * padding.left + 2 * padding.right + 2 * gtk_container_get_border_width (GTK_CONTAINER (w)) +
-		sb_req.width + gh->char_width * (gh->priv->default_cpl + (gh->priv->default_cpl - 1) /
+		sb_width + gh->char_width * (gh->priv->default_cpl + (gh->priv->default_cpl - 1) /
 										 gh->group_type);
 	if(gh->show_offsets)
 		req->width += padding.left + padding.right + 8 * gh->char_width;
@@ -2119,6 +2115,8 @@ static void gtk_hex_class_init(GtkHexClass *klass, gpointer data) {
 	GTK_WIDGET_CLASS(klass)->key_release_event = gtk_hex_key_release;
 	GTK_WIDGET_CLASS(klass)->button_release_event = gtk_hex_button_release;
 
+	gtk_widget_class_set_css_name (GTK_WIDGET_CLASS(klass), "hex-editor");
+
 	object_class->finalize = gtk_hex_finalize;
 
 	parent_class = g_type_class_ref (gtk_fixed_get_type ());
@@ -2129,6 +2127,8 @@ static void gtk_hex_class_init(GtkHexClass *klass, gpointer data) {
 static void gtk_hex_init(GtkHex *gh, gpointer klass) {
 	GtkCssProvider *provider;
 	GtkStyleContext *context;
+
+	context = gtk_widget_get_style_context (GTK_WIDGET (gh));
 
 	gh->priv = GTKHEX_GET_PRIVATE (gh);
 	gh->priv->disp_buffer = NULL;
@@ -2163,6 +2163,11 @@ static void gtk_hex_init(GtkHex *gh, gpointer klass) {
 	/* get ourselves a decent monospaced font for rendering text */
 	gh->disp_font_metrics = gtk_hex_load_font (DEFAULT_FONT);
 	gh->font_desc = pango_font_description_from_string (DEFAULT_FONT);
+	gh->font_provider = gtk_css_provider_new ();
+	gtk_style_context_add_provider (context,
+	                                GTK_STYLE_PROVIDER (gh->font_provider),
+	                                GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+
 
 	gh->char_width = get_max_char_width(gh, gh->disp_font_metrics);
 	gh->char_height = PANGO_PIXELS (pango_font_metrics_get_ascent (gh->disp_font_metrics)) + PANGO_PIXELS (pango_font_metrics_get_descent (gh->disp_font_metrics)) + 2;
@@ -2172,10 +2177,9 @@ static void gtk_hex_init(GtkHex *gh, gpointer klass) {
 	gtk_widget_set_events(GTK_WIDGET(gh), GDK_KEY_PRESS_MASK);
 	gtk_container_set_border_width(GTK_CONTAINER(gh), DISPLAY_BORDER);
 	
-	context = gtk_widget_get_style_context (GTK_WIDGET (gh));
 	provider = gtk_css_provider_new ();
 	gtk_css_provider_load_from_data (GTK_CSS_PROVIDER (provider),
-	                                 "GtkHex {\n"
+	                                 "hex-editor {\n"
 	                                 "   border-style: solid;\n"
 	                                 "   border-width: 1px;\n"
 	                                 "   padding: 1px;\n"
@@ -2187,9 +2191,6 @@ static void gtk_hex_init(GtkHex *gh, gpointer klass) {
 
 	gh->adj = GTK_ADJUSTMENT(gtk_adjustment_new(0.0, 0.0, 0.0, 0.0, 0.0, 0.0));
 	gh->xdisp = gtk_drawing_area_new();
-
-	/* Modify the font for the widget */
-	gtk_widget_modify_font (gh->xdisp, gh->font_desc);
 
 	/* Create the pango layout for the widget */
 	gh->xlayout = gtk_widget_create_pango_layout (gh->xdisp, "");
@@ -2214,9 +2215,6 @@ static void gtk_hex_init(GtkHex *gh, gpointer klass) {
 	gtk_widget_show(gh->xdisp);
 	
 	gh->adisp = gtk_drawing_area_new();
-
-	/* Modify the font for the widget */
-	gtk_widget_modify_font (gh->adisp, gh->font_desc);
 
 	/* Create the pango layout for the widget */
 	gh->alayout = gtk_widget_create_pango_layout (gh->adisp, "");
@@ -2464,7 +2462,9 @@ void gtk_hex_set_group_type(GtkHex *gh, guint gt) {
  * sets font for displaying data
  */
 void gtk_hex_set_font(GtkHex *gh, PangoFontMetrics *font_metrics, const PangoFontDescription *font_desc) {
-	GtkAllocation allocation;
+	GtkAllocation    allocation;
+	const gchar     *font;
+	gint             size;
 
 	g_return_if_fail(gh != NULL);
 	g_return_if_fail(GTK_IS_HEX(gh));
@@ -2478,15 +2478,14 @@ void gtk_hex_set_font(GtkHex *gh, PangoFontMetrics *font_metrics, const PangoFon
 	gh->disp_font_metrics = pango_font_metrics_ref (font_metrics);
 	gh->font_desc = pango_font_description_copy (font_desc);
 
-	if (gh->xdisp)
-		gtk_widget_modify_font (gh->xdisp, gh->font_desc);
+	font = pango_font_description_get_family (gh->font_desc);
+	if (pango_font_description_get_size_is_absolute (gh->font_desc))
+		size = pango_font_description_get_size (gh->font_desc);
+	else
+		size = pango_font_description_get_size (gh->font_desc) / PANGO_SCALE;
 
-	if (gh->adisp)
-		gtk_widget_modify_font (gh->adisp, gh->font_desc);
-
-	if (gh->offsets)
-		gtk_widget_modify_font (gh->offsets, gh->font_desc);
-
+	gtk_css_provider_load_from_data (GTK_CSS_PROVIDER (gh->font_provider),
+	                                 g_strdup_printf (FONT_CSS, font, size), -1, NULL);
 
 	gh->char_width = get_max_char_width(gh, gh->disp_font_metrics);
 	gh->char_height = PANGO_PIXELS (pango_font_metrics_get_ascent (gh->disp_font_metrics)) + PANGO_PIXELS (pango_font_metrics_get_descent (gh->disp_font_metrics)) + 2;
