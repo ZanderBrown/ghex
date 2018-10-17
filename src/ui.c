@@ -915,8 +915,6 @@ update_dialog_titles()
 {
 	if(replace_dialog)
 		create_dialog_title(replace_dialog->window, _("GHex (%s): Find & Replace Data"));
-	if(find_dialog)
-		create_dialog_title(find_dialog->window, _("GHex (%s): Find Data"));
 }
 
 void

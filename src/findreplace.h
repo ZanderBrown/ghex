@@ -82,8 +82,12 @@ struct _AdvancedFind_AddDialog {
 	GtkWidget *colour;
 };
 
-extern FindDialog     *find_dialog;
 extern ReplaceDialog  *replace_dialog;
+
+#define G_HEX_TYPE_FIND (g_hex_find_get_type ())
+G_DECLARE_FINAL_TYPE (GHexFind, g_hex_find, G_HEX, FIND, GtkDialog)
+
+GtkWidget *g_hex_find_new (GtkWindow *parent);
 
 
 #define G_HEX_TYPE_GOTO (g_hex_goto_get_type ())
@@ -92,7 +96,6 @@ G_DECLARE_FINAL_TYPE (GHexGoto, g_hex_goto, G_HEX, GOTO, GtkDialog)
 GtkWidget *g_hex_goto_new (GtkWindow *parent);
 
 /* creation of dialogs */
-FindDialog         *create_find_dialog         (void);
 ReplaceDialog      *create_replace_dialog      (void);
 AdvancedFindDialog *create_advanced_find_dialog(GHexWindow *parent);
 void               delete_advanced_find_dialog (AdvancedFindDialog *dialog);

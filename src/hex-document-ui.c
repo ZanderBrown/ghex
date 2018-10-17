@@ -67,15 +67,13 @@ find_cb (GSimpleAction *action,
          GVariant *value,
          GHexWindow *window)
 {
-	if(!find_dialog)
-		find_dialog = create_find_dialog();
+	GtkWidget *dialog;
 
-	if(!gtk_widget_get_visible(find_dialog->window)) {
-		gtk_window_set_position (GTK_WINDOW(find_dialog->window), GTK_WIN_POS_MOUSE);
-		gtk_window_set_default(GTK_WINDOW(find_dialog->window), find_dialog->f_next);
-		gtk_widget_show(find_dialog->window);
-	}
-	raise_and_focus_widget(find_dialog->window);
+	dialog = g_hex_find_new (GTK_WINDOW (window));
+
+	gtk_widget_show(dialog);
+
+	raise_and_focus_widget(dialog);
 }
 
 void
