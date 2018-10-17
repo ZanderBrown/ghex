@@ -1034,8 +1034,8 @@ ghex_window_save_as(GHexWindow *win)
         gtk_file_chooser_dialog_new(_("Select a file to save buffer as"),
                                     GTK_WINDOW(win),
                                     GTK_FILE_CHOOSER_ACTION_SAVE,
-                                    GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL,
-                                    GTK_STOCK_SAVE, GTK_RESPONSE_OK,
+                                    _("Cancel"), GTK_RESPONSE_CANCEL,
+                                    _("Save"), GTK_RESPONSE_OK,
                                     NULL);
 
 	if(doc->file_name)
@@ -1132,7 +1132,6 @@ ghex_window_ok_to_close(GHexWindow *win)
 	GtkWidget *mbox;
 	gint reply;
 	gboolean file_exists;
-	GtkWidget *save_btn;
     HexDocument *doc;
 
     if(win->gh == NULL)
@@ -1151,11 +1150,9 @@ ghex_window_ok_to_close(GHexWindow *win)
                                     "Do you want to save changes?"),
                                   doc->path_end);
 			
-	save_btn = create_button(mbox, GTK_STOCK_NO, _("Do_n't save"));
-	gtk_widget_show (save_btn);
-	gtk_dialog_add_action_widget(GTK_DIALOG(mbox), save_btn, GTK_RESPONSE_NO);
-	gtk_dialog_add_button(GTK_DIALOG(mbox), GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL);
-	gtk_dialog_add_button(GTK_DIALOG(mbox), GTK_STOCK_SAVE, GTK_RESPONSE_YES);
+	gtk_dialog_add_button(GTK_DIALOG(mbox), _("Do_n't save"), GTK_RESPONSE_NO);
+	gtk_dialog_add_button(GTK_DIALOG(mbox), _("_Cancel"), GTK_RESPONSE_CANCEL);
+	gtk_dialog_add_button(GTK_DIALOG(mbox), _("_Save"), GTK_RESPONSE_YES);
 	gtk_dialog_set_default_response(GTK_DIALOG(mbox), GTK_RESPONSE_YES);
 	gtk_window_set_resizable(GTK_WINDOW(mbox), FALSE);
 	

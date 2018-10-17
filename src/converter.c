@@ -231,7 +231,7 @@ create_converter()
 
 	conv->window = gtk_dialog_new_with_buttons(_("Base Converter"),
 											   NULL, 0,
-											   GTK_STOCK_CLOSE,
+											   _("Close"),
 											   GTK_RESPONSE_OK,
 											   NULL);
 	g_signal_connect(G_OBJECT(conv->window), "response",

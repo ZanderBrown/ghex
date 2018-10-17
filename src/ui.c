@@ -76,31 +76,6 @@ ask_user(GtkMessageDialog *message_box)
 	return gtk_dialog_run(GTK_DIALOG(message_box));
 }
 
-GtkWidget *
-create_button(GtkWidget *window, const gchar *type, gchar *text)
-{
-	GtkWidget *button, *pixmap, *label, *hbox;
-	
-	hbox = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, 2);
-	
-	label = gtk_label_new_with_mnemonic(text);
-
-	pixmap = gtk_image_new_from_stock (type, GTK_ICON_SIZE_BUTTON);
-
-	gtk_box_pack_start(GTK_BOX(hbox), pixmap, FALSE, FALSE, 1);
-	gtk_box_pack_start(GTK_BOX(hbox), label, FALSE, FALSE, 1);
-	
-	button = gtk_button_new();
-	gtk_label_set_mnemonic_widget(GTK_LABEL(label), GTK_WIDGET(button));
-	gtk_container_add(GTK_CONTAINER(button), hbox);
-	
-	gtk_widget_show(label);
-	gtk_widget_show(pixmap);
-	gtk_widget_show(hbox);
-	
-	return button;
-}
-
 void
 create_dialog_title(GtkWidget *window, gchar *title)
 {
@@ -336,8 +311,8 @@ open_cb (GSimpleAction *action,
 	file_sel = gtk_file_chooser_dialog_new(_("Select a file to open"),
 										   GTK_WINDOW(win),
 										   GTK_FILE_CHOOSER_ACTION_OPEN,
-										   GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL,
-										   GTK_STOCK_OPEN, GTK_RESPONSE_OK,
+										   _("Cancel"), GTK_RESPONSE_CANCEL,
+										   _("Open"), GTK_RESPONSE_OK,
 										   NULL);
 	gtk_window_set_modal (GTK_WINDOW(file_sel), TRUE);
 	gtk_window_set_position (GTK_WINDOW (file_sel), GTK_WIN_POS_MOUSE);
@@ -445,8 +420,8 @@ export_html_cb (GSimpleAction *action,
 	file_sel = gtk_file_chooser_dialog_new(_("Select path and file name for the HTML source"),
 										   GTK_WINDOW(win),
 										   GTK_FILE_CHOOSER_ACTION_SAVE,
-										   GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL,
-										   GTK_STOCK_SAVE, GTK_RESPONSE_OK,
+										   _("Cancel"), GTK_RESPONSE_CANCEL,
+										   _("Save"), GTK_RESPONSE_OK,
 										   NULL);
 #if 0
 	gtk_file_chooser_set_filename(GTK_FILE_CHOOSER(file_sel), doc->file_name);

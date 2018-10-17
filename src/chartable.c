@@ -225,7 +225,7 @@ GtkWidget *create_char_table()
 					 G_CALLBACK(key_press_cb), GTK_TREE_MODEL(store));
 	gtk_widget_grab_focus(ctv);
 
-	cbtn = gtk_button_new_from_stock(GTK_STOCK_CLOSE);
+	cbtn = gtk_button_new_with_label (_("Close"));
 	gtk_widget_show(cbtn);
 	g_signal_connect(G_OBJECT (cbtn), "clicked",
 					G_CALLBACK(hide_chartable_cb), ct);

@@ -69,11 +69,11 @@ create_prefs_dialog()
 	gtk_window_set_title(GTK_WINDOW(pui->pbox), _("GHex Preferences"));
 	
 	gtk_dialog_add_button (GTK_DIALOG (pui->pbox),
-						   GTK_STOCK_CLOSE,
+						   _("Close"),
 						   GTK_RESPONSE_CLOSE);
 
 	gtk_dialog_add_button (GTK_DIALOG (pui->pbox),
-						   GTK_STOCK_HELP,
+						   _("Help"),
 						   GTK_RESPONSE_HELP);
 
 	g_signal_connect(G_OBJECT(pui->pbox), "response",

@@ -39,7 +39,6 @@ void display_info_dialog (GHexWindow *win, const gchar *msg, ...);
 void raise_and_focus_widget(GtkWidget *);
 void set_doc_menu_sensitivity(HexDocument *doc);
 void update_dialog_titles (void);
-GtkWidget *create_button   (GtkWidget *, const gchar *, gchar *);
 
 /* hiding widgets on cancel or delete_event */
 gint delete_event_cb(GtkWidget *, GdkEventAny *, GtkWindow *);
