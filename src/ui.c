@@ -552,7 +552,6 @@ close_cb (GSimpleAction *action,
 	window_list = ghex_window_get_list();
 	while(window_list) {
 		other_win = GHEX_WINDOW(window_list->data);
-		ghex_window_remove_doc_from_list(other_win, doc);
 		window_list = window_list->next;
 		if(other_win->gh && other_win->gh->document == doc && other_win != win)
 			gtk_widget_destroy(GTK_WIDGET(other_win));

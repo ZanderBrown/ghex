@@ -55,11 +55,6 @@ struct _GHexWindow
     GtkWidget *statusbar_display_mode_btn;
     guint      statusbar_tooltip_id;
 
-    GtkActionGroup *action_group;
-    GtkActionGroup *doc_list_action_group;
-    GtkUIManager   *ui_manager;
-    guint           ui_merge_id;
-
     gboolean changed, undo_sens, redo_sens;
 
     struct _HexDialog *dialog;
@@ -87,21 +82,11 @@ const GList       *ghex_window_get_list          (void);
 GHexWindow        *ghex_window_get_active        (void);
 void              ghex_window_set_doc_name       (GHexWindow *win,
                                                   const gchar *name);
-void              ghex_window_set_action_visible (GHexWindow *win,
-                                                  const char *name,
-                                                  gboolean    visible);
-void              ghex_window_set_action_sensitive (GHexWindow *win,
-                                                    const char *name,
-                                                    gboolean    sensitive);
 void              ghex_window_set_sensitivity    (GHexWindow *win);
 void              ghex_window_show_status        (GHexWindow *win,
                                                   const gchar *msg);
 void              ghex_window_flash              (GHexWindow *win,
                                                   const gchar * flash);
-void              ghex_window_remove_doc_from_list(GHexWindow *win,
-                                                   HexDocument *doc);
-void              ghex_window_add_doc_to_list     (GHexWindow *win,
-                                                   HexDocument *doc);
 GHexWindow        *ghex_window_find_for_doc       (HexDocument *doc);
 
 void ghex_window_sync_char_table_item(GHexWindow *win, gboolean state);

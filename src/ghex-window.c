@@ -43,6 +43,9 @@
 #define GHEX_WINDOW_DEFAULT_WIDTH 320
 #define GHEX_WINDOW_DEFAULT_HEIGHT 256
 
+typedef void (*Action)(GSimpleAction *action, GVariant *param, gpointer data);
+#define ACTION(f) ((Action) (f))
+
 G_DEFINE_TYPE (GHexWindow, ghex_window, GTK_TYPE_APPLICATION_WINDOW)
 
 static GList *window_list = NULL;
@@ -135,17 +138,7 @@ ghex_window_close(GHexWindow *win)
 			return FALSE;
 	}	
 
-    /* We dont have to unref the document if the view is the only one */
-    if(doc->views->next == NULL) {
-        window_list = ghex_window_get_list();
-        while(window_list) {
-            ghex_window_remove_doc_from_list(GHEX_WINDOW(window_list->data),
-                                             win->gh->document);
-            window_list = window_list->next;
-        }
-    }
-
-	/* If we have created the converter window disable the 
+	/* If we have created the converter window disable the
 	 * "Get cursor value" button
 	 */
 	if (converter_get)
@@ -173,28 +166,6 @@ ghex_window_focus_in_event(GtkWidget *win, GdkEventFocus *event)
         return GTK_WIDGET_CLASS (ghex_window_parent_class)->focus_in_event (win, event);
     else
         return TRUE;
-}
-
-void
-ghex_window_set_action_visible (GHexWindow *win,
-                                const char *name,
-                                gboolean    visible)
-{
-    GtkAction *action;
-
-    action = gtk_action_group_get_action (win->action_group, name);
-    gtk_action_set_visible (action, visible);
-}
-
-void
-ghex_window_set_action_sensitive (GHexWindow *win,
-                                  const char *name,
-                                  gboolean    sensitive)
-{
-    GtkAction *action;
-
-    action = gtk_action_group_get_action (win->action_group, name);
-    gtk_action_set_sensitive (action, sensitive);
 }
 
 static void
@@ -324,19 +295,6 @@ ghex_window_destroy (GtkWidget *object)
             win->gh = NULL;
         }
 
-        if (win->action_group) {
-            g_object_unref (win->action_group);
-            win->action_group = NULL;
-        }
-        if (win->doc_list_action_group) {
-            g_object_unref (win->doc_list_action_group);
-            win->doc_list_action_group = NULL;
-        }
-        if (win->ui_manager) {
-            g_object_unref (win->ui_manager);
-            win->ui_manager = NULL;
-        }
-
         if (win->dialog)
         {
             g_object_unref (G_OBJECT(win->dialog));
@@ -364,127 +322,66 @@ ghex_window_delete_event(GtkWidget *widget, GdkEventAny *e)
 /* Actions */
 static const GActionEntry gaction_entries [] = {
     // Open a file
-    { "open", G_CALLBACK (open_cb) },
+    { "open", ACTION (open_cb) },
     // Save the current file
-    { "save", G_CALLBACK (save_cb) },
+    { "save", ACTION (save_cb) },
     // Save the current file with a different name
-    { "save-as", G_CALLBACK (save_as_cb) },
+    { "save-as", ACTION (save_as_cb) },
     // Export data to HTML source
-    { "export", G_CALLBACK (export_html_cb) },
+    { "export", ACTION (export_html_cb) },
     // Revert to a saved version of the file
-    { "revert", G_CALLBACK (revert_cb) },
+    { "revert", ACTION (revert_cb) },
     // Print the current file
-    { "print", G_CALLBACK (print_cb) },
+    { "print", ACTION (print_cb) },
     // Preview printed data
-    { "print-preview", G_CALLBACK (print_preview_cb) },
+    { "print-preview", ACTION (print_preview_cb) },
 
     // Undo the last action
-    { "undo", G_CALLBACK (undo_cb) },
+    { "undo", ACTION (undo_cb) },
     // Redo the undone action
-    { "redo", G_CALLBACK (redo_cb) },
+    { "redo", ACTION (redo_cb) },
     // Cut selection
-    { "cut", G_CALLBACK (cut_cb) },
+    { "cut", ACTION (cut_cb) },
     // Copy selection to clipboard
-    { "copy", G_CALLBACK (copy_cb) },
+    { "copy", ACTION (copy_cb) },
     // Paste data from clipboard
-    { "paste", G_CALLBACK (paste_cb) },
+    { "paste", ACTION (paste_cb) },
 
     // Search for a string
-    { "find", G_CALLBACK (find_cb) },
+    { "find", ACTION (find_cb) },
     // Replace a string
-    { "replace", G_CALLBACK (replace_cb) },
+    { "replace", ACTION (replace_cb) },
     // Advanced Find
-    { "find-advanced", G_CALLBACK (advanced_find_cb) },
+    { "find-advanced", ACTION (advanced_find_cb) },
     // Jump to a certain position
-    { "goto", G_CALLBACK (jump_cb) },
+    { "goto", ACTION (jump_cb) },
     // Insert/overwrite data
-    { "insert", NULL, NULL, "false", G_CALLBACK (insert_mode_cb) },
+    { "insert", NULL, NULL, "false", ACTION (insert_mode_cb) },
 
     // Group data by 8/16/32 bits
-    { "group", NULL, "s", "'byte'", G_CALLBACK (group_data_cb) },
+    { "group", NULL, "s", "'byte'", ACTION (group_data_cb) },
 
     // Show the character table
-    { "char-table", NULL, NULL, "false", G_CALLBACK (character_table_cb) },
+    { "char-table", NULL, NULL, "false", ACTION (character_table_cb) },
     // Open base conversion dialog
-    { "base-tool", NULL, NULL, "false", G_CALLBACK (converter_cb) },
+    { "base-tool", NULL, NULL, "false", ACTION (converter_cb) },
     // Show the type conversion dialog in the edit window
-    { "type-tool", NULL, NULL, "false", G_CALLBACK (type_dialog_cb) },
+    { "type-tool", NULL, NULL, "false", ACTION (type_dialog_cb) },
 
     // Add a new view to the buffer
-    { "open-view", G_CALLBACK (add_view_cb) },
+    { "open-view", ACTION (add_view_cb) },
 
     // Configure the application
-    { "prefs", G_CALLBACK (prefs_cb) },
+    { "prefs", ACTION (prefs_cb) },
     // Help on this application
-    { "help", G_CALLBACK (help_cb) },
+    { "help", ACTION (help_cb) },
     // About this application
-    { "about", G_CALLBACK (about_cb) },
+    { "about", ACTION (about_cb) },
     // Exit the program
-    { "quit", G_CALLBACK (quit_app_cb) },
+    { "quit", ACTION (quit_app_cb) },
     // Close the current file
-    { "close", G_CALLBACK (close_cb) }
+    { "close", ACTION (close_cb) }
 };
-
-/* Normal items */
-static const GtkActionEntry action_entries [] = {
-    { "Windows", NULL, N_("_Windows") },
-};
-
-static void
-menu_item_selected_cb (GtkWidget  *item,
-                       GHexWindow *window)
-{
-    GtkAction *action;
-    gchar *tooltip;
-
-    action = gtk_activatable_get_related_action (GTK_ACTIVATABLE (item));
-    g_object_get (G_OBJECT (action), "tooltip", &tooltip, NULL);
-
-    if (tooltip != NULL)
-        gtk_statusbar_push (GTK_STATUSBAR (window->statusbar),
-                            window->statusbar_tooltip_id,
-                            tooltip);
-
-    g_free (tooltip);
-}
-
-static void
-menu_item_deselected_cb (GtkWidget  *item,
-                         GHexWindow *window)
-{
-    gtk_statusbar_pop (GTK_STATUSBAR (window->statusbar),
-                       window->statusbar_tooltip_id);
-}
-
-static void
-connect_proxy_cb (GtkUIManager *ui,
-                  GtkAction    *action,
-                  GtkWidget    *proxy,
-                  GHexWindow   *window)
-{
-    if (!GTK_IS_MENU_ITEM (proxy))
-        return;
-
-    g_signal_connect (G_OBJECT (proxy), "select",
-                      G_CALLBACK (menu_item_selected_cb), window);
-    g_signal_connect (G_OBJECT (proxy), "deselect",
-                      G_CALLBACK (menu_item_deselected_cb), window);
-}
-
-static void
-disconnect_proxy_cb (GtkUIManager *manager,
-                     GtkAction    *action,
-                     GtkWidget    *proxy,
-                     GHexWindow   *window)
-{
-    if (!GTK_IS_MENU_ITEM (proxy))
-        return;
-
-    g_signal_handlers_disconnect_by_func
-        (proxy, G_CALLBACK (menu_item_selected_cb), window);
-    g_signal_handlers_disconnect_by_func
-        (proxy, G_CALLBACK (menu_item_deselected_cb), window);
-}
 
 void
 ghex_window_set_contents (GHexWindow *win,
@@ -512,7 +409,6 @@ ghex_window_constructor (GType                  type,
     GObject    *object;
     GHexWindow *window;
     GtkWidget  *header;
-    GtkWidget  *menubar;
     GtkWidget  *btn;
     GtkWidget  *box;
     GtkWidget  *image;
@@ -530,42 +426,7 @@ ghex_window_constructor (GType                  type,
                                      G_N_ELEMENTS (gaction_entries),
                                      window);
 
-    window->ui_merge_id = 0;
-    window->ui_manager = gtk_ui_manager_new ();
-    g_signal_connect (G_OBJECT (window->ui_manager), "connect-proxy",
-                      G_CALLBACK (connect_proxy_cb), window);
-    g_signal_connect (G_OBJECT (window->ui_manager), "disconnect-proxy",
-                      G_CALLBACK (disconnect_proxy_cb), window);
-
-    /* Action group for static menu items */
-    window->action_group = gtk_action_group_new ("GHexActions");
-    gtk_action_group_set_translation_domain (window->action_group,
-                                             GETTEXT_PACKAGE);
-    gtk_action_group_add_actions (window->action_group, action_entries,
-                                  G_N_ELEMENTS (action_entries),
-                                  window);
-    gtk_ui_manager_insert_action_group (window->ui_manager,
-                                        window->action_group, 0);
-    gtk_window_add_accel_group (GTK_WINDOW (window),
-                                gtk_ui_manager_get_accel_group (window->ui_manager));
-
-    /* Action group for open documents */
-    window->doc_list_action_group = gtk_action_group_new ("DocListActions");
-    gtk_ui_manager_insert_action_group (window->ui_manager,
-                                        window->doc_list_action_group, 0);
-
-    /* Load menu description from resources framework */
-    if (!gtk_ui_manager_add_ui_from_resource (window->ui_manager, "/org/gnome/ghex/ghex-ui.xml", &error)) {
-        g_warning ("Failed to load ui: %s", error->message);
-        g_error_free (error);
-    }
-
     window->vbox = gtk_box_new (GTK_ORIENTATION_VERTICAL, 0);
-
-    /* Attach menu */
-    menubar = gtk_ui_manager_get_widget (window->ui_manager, "/MainMenu");
-    gtk_box_pack_start (GTK_BOX (window->vbox), menubar, FALSE, TRUE, 0);
-    gtk_widget_show (menubar);
 
     window->contents = NULL;
 
@@ -749,12 +610,6 @@ ghex_window_new (GtkApplication *application)
 
     ghex_window_set_sensitivity(win);
 
-    doc_list = hex_document_get_list();
-    while(doc_list) {
-        ghex_window_add_doc_to_list(win, HEX_DOCUMENT(doc_list->data));
-        doc_list = doc_list->next;
-    }
-
     gtk_window_set_default_size(GTK_WINDOW(win),
                                 GHEX_WINDOW_DEFAULT_WIDTH,
                                 GHEX_WINDOW_DEFAULT_HEIGHT);
@@ -920,12 +775,6 @@ ghex_window_load(GHexWindow *win, const gchar *filename)
     }
 
     if(win->gh) {
-        window_list = ghex_window_get_list();
-        while(window_list) {
-            ghex_window_remove_doc_from_list(GHEX_WINDOW(window_list->data),
-                                             win->gh->document);
-            window_list = window_list->next;
-        }
         hex_document_remove_view(win->gh->document, GTK_WIDGET(win->gh));
         g_signal_handlers_disconnect_matched(win->gh->document,
                                              G_SIGNAL_MATCH_FUNC | G_SIGNAL_MATCH_DATA,
@@ -936,12 +785,6 @@ ghex_window_load(GHexWindow *win, const gchar *filename)
     ghex_window_set_contents (win, vbox);
     win->gh = GTK_HEX(gh);
     win->changed = FALSE;
-
-    window_list = ghex_window_get_list();
-    while(window_list) {
-        ghex_window_add_doc_to_list(GHEX_WINDOW(window_list->data), win->gh->document);
-        window_list = window_list->next;
-    }
 
     ghex_window_set_doc_name(win, win->gh->document->path_end);
     ghex_window_set_sensitivity(win);
@@ -1048,83 +891,6 @@ encode_xml (const gchar* text)
     }
     
 	return g_string_free (str, FALSE);
-}
-
-static void
-ghex_window_doc_menu_update (GHexWindow *win)
-{
-    GList *items, *l;
-
-    /* Remove existing entries from UI manager */
-    if (win->ui_merge_id > 0) {
-        gtk_ui_manager_remove_ui (win->ui_manager,
-                                  win->ui_merge_id);
-        gtk_ui_manager_ensure_update (win->ui_manager);
-    }
-    win->ui_merge_id = gtk_ui_manager_new_merge_id (win->ui_manager);
-
-    /* Populate the UI with entries from the action group */
-    items = gtk_action_group_list_actions (win->doc_list_action_group);
-    for (l = items; l && l->data; l = g_list_next (l)) {
-        GtkAction *action;
-        const gchar *action_name;
-
-        action = (GtkAction *) l->data;
-        action_name = gtk_action_get_name (action);
-
-        gtk_ui_manager_add_ui (win->ui_manager,
-                               win->ui_merge_id,
-                               "/MainMenu/Windows/OpenDocuments",
-                               action_name,
-                               action_name,
-                               GTK_UI_MANAGER_MENUITEM,
-                               FALSE);
-    }
-}
-
-void
-ghex_window_remove_doc_from_list(GHexWindow *win, HexDocument *doc)
-{
-    GtkAction *action;
-    gchar *action_name;
-
-    action_name = g_strdup_printf ("FilesFile_%p", doc);
-    action = gtk_action_group_get_action (win->doc_list_action_group,
-                                          action_name);
-    g_free (action_name);
-
-    gtk_action_group_remove_action (win->doc_list_action_group,
-                                    action);
-    ghex_window_doc_menu_update (win);
-}
-
-void
-ghex_window_add_doc_to_list(GHexWindow *win, HexDocument *doc)
-{
-    GtkAction *action;
-    gchar *action_name;
-    gchar *escaped_name;
-    gchar *tip;
-
-    escaped_name = encode_xml (doc->path_end);
-    tip = g_strdup_printf(_("Activate file %s"), escaped_name);
-    g_free(escaped_name);
-    escaped_name = encode_xml_and_escape_underscores(doc->path_end);
-    action_name = g_strdup_printf ("FilesFile_%p", doc);
-
-    action = gtk_action_new (action_name, escaped_name, tip, NULL);
-    g_signal_connect (action, "activate",
-                      G_CALLBACK (file_list_activated_cb),
-                      (gpointer) doc);
-    gtk_action_group_add_action (win->doc_list_action_group,
-                                 action);
-    g_object_unref (action);
-
-    ghex_window_doc_menu_update (win);
-
-    g_free (tip);
-    g_free (escaped_name);
-    g_free (action_name);
 }
 
 const GList *
