@@ -913,10 +913,8 @@ display_info_dialog (GHexWindow *win, const gchar *msg, ...)
 void
 update_dialog_titles()
 {
-	if(jump_dialog)
-		create_dialog_title(jump_dialog->window, _("GHex (%s): Jump To Byte"));
 	if(replace_dialog)
-      	create_dialog_title(replace_dialog->window, _("GHex (%s): Find & Replace Data")); 
+		create_dialog_title(replace_dialog->window, _("GHex (%s): Find & Replace Data"));
 	if(find_dialog)
 		create_dialog_title(find_dialog->window, _("GHex (%s): Find Data"));
 }

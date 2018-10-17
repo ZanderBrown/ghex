@@ -45,7 +45,6 @@ static void find_prev_cb(GtkButton *button, FindDialog *);
 static void replace_next_cb(GtkButton *button, gpointer);
 static void replace_one_cb(GtkButton *button, gpointer);
 static void replace_all_cb(GtkButton *button, gpointer);
-static void goto_byte_cb(GtkButton *button, GtkWidget *);
 static gint get_search_string(HexDocument *doc, gchar **str);
 
 static void advanced_find_add_add_cb(GtkButton *button,
@@ -56,9 +55,8 @@ static void advanced_find_next_cb(GtkButton *button, AdvancedFindDialog *dialog)
 static void advanced_find_prev_cb(GtkButton *button, AdvancedFindDialog *dialog);
 
 
-FindDialog *find_dialog = NULL;
+FindDialog    *find_dialog = NULL;
 ReplaceDialog *replace_dialog = NULL;
-JumpDialog *jump_dialog = NULL;
 
 /* basic structure to hold private information to be stored in the
  * gtk list.
@@ -417,55 +415,173 @@ ReplaceDialog *create_replace_dialog()
 	return dialog;
 }
 
-JumpDialog *create_jump_dialog()
+struct _GHexGoto
 {
-	JumpDialog *dialog;
+	GtkDialog parent;
 
-	dialog = g_new0(JumpDialog, 1);
+	GtkWidget *entry;
+};
 
-	dialog->window = gtk_dialog_new();
-	g_signal_connect(G_OBJECT(dialog->window), "delete_event",
-					 G_CALLBACK(delete_event_cb), dialog->window);
-	
-	create_dialog_title(dialog->window, _("GHex (%s): Jump To Byte"));
-	
-	dialog->int_entry = gtk_entry_new();
-	gtk_box_pack_start(GTK_BOX(gtk_dialog_get_content_area(GTK_DIALOG(dialog->window))), dialog->int_entry,
-					   TRUE, TRUE, 0);
-	g_signal_connect_swapped (G_OBJECT (dialog->int_entry),
-	                          "activate", G_CALLBACK(gtk_window_activate_default),
-	                          GTK_WINDOW (dialog->window));
-	gtk_widget_show(dialog->int_entry);
+G_DEFINE_TYPE (GHexGoto, g_hex_goto, GTK_TYPE_DIALOG)
 
-	dialog->ok = gtk_dialog_add_button (GTK_DIALOG (dialog->window),
-										_("Goto"),
-										GTK_RESPONSE_APPLY);
-	g_signal_connect (G_OBJECT (dialog->ok),
-					  "clicked", G_CALLBACK(goto_byte_cb),
-					  dialog->int_entry);
+static void
+g_hex_goto_class_init (GHexGotoClass *klass)
+{
+}
 
-	gtk_widget_set_can_default(dialog->ok, TRUE);
-	gtk_widget_show(dialog->ok);
-	dialog->cancel = gtk_dialog_add_button (GTK_DIALOG (dialog->window),
-											_("Cancel"),
-											GTK_RESPONSE_CANCEL);
-	g_signal_connect (G_OBJECT (dialog->cancel),
-					  "clicked", G_CALLBACK(cancel_cb),
-					  dialog->window);
+static void
+g_hex_goto_show (GHexGoto *self, gpointer data)
+{
+	gtk_widget_grab_focus (self->entry);
+}
 
-	gtk_widget_set_can_default(dialog->cancel, TRUE);
-	gtk_widget_show(dialog->cancel);
-	
-	gtk_container_set_border_width(GTK_CONTAINER(gtk_dialog_get_content_area(GTK_DIALOG(dialog->window))), 2);
-	gtk_box_set_spacing(GTK_BOX(gtk_dialog_get_content_area(GTK_DIALOG(dialog->window))), 2);
+static void
+g_hex_goto_response (GHexGoto *self, gint res, gpointer data)
+{
+	guint byte = 2, len, i;
+	gint is_relative = 0;
+	gboolean is_hex;
+	const gchar *byte_str = gtk_entry_get_text (GTK_ENTRY (self->entry));
+	GHexWindow *win = GHEX_WINDOW (gtk_window_get_transient_for (GTK_WINDOW (self)));
 
-	if (GTK_IS_ACCESSIBLE (gtk_widget_get_accessible(dialog->int_entry))) {
-		add_atk_namedesc (dialog->int_entry, _("Jump to byte"), _("Enter the byte to jump to"));
-		add_atk_namedesc (dialog->ok, _("OK"), _("Jumps to the specified byte"));
-		add_atk_namedesc (dialog->cancel, _("Cancel"), _("Closes jump to byte window"));
+	if (res == GTK_RESPONSE_CANCEL) {
+		gtk_widget_destroy (GTK_WIDGET (self));
+		return;
 	}
 
-	return dialog;
+	if(win == NULL || win->gh == NULL) {
+		display_error_dialog (win,
+							  _("There is no active document to move the "
+								"cursor in!"));
+		return;
+	}
+	
+	len = strlen(byte_str);
+	
+	if(len > 1 && byte_str[0] == '+') {
+		is_relative = 1;
+		byte_str++;
+		len--;
+	} else if(len > 1 && byte_str[0] == '-') {
+		is_relative = -1;
+		byte_str++;
+		len--;
+	}
+
+	if(len == 0) {
+		display_error_dialog (win, _("No offset has been specified!"));
+		return;
+	}
+
+	is_hex = ((len > 2) && (byte_str[0] == '0') && (byte_str[1] == 'x'));
+
+	if(!is_hex) {
+		for(i = 0; i < len; i++)
+			if(!(byte_str[i] >= '0' && byte_str[i] <= '9'))
+				break;
+	}
+	else {
+		for(i = 2; i < len; i++)
+			if(!((byte_str[i] >= '0' && byte_str[i] <= '9') ||
+				 (byte_str[i] >= 'A' && byte_str[i] <= 'F') ||
+				 (byte_str[i] >= 'a' && byte_str[i] <= 'f')))
+				break;
+	}
+
+	if((i == len) &&
+	   ((sscanf(byte_str, "0x%x", &byte) == 1) ||
+		(sscanf(byte_str, "%d", &byte) == 1))) {
+		if(is_relative) {
+			if(is_relative == -1 && byte > win->gh->cursor_pos) {
+				display_error_dialog(win,
+								 _("The specified offset is beyond the "
+								" file boundaries!"));
+				return;
+			}
+			byte = byte * is_relative + win->gh->cursor_pos;
+		}
+		if(byte >= win->gh->document->file_size)
+			display_error_dialog(win,
+								 _("Can not position cursor beyond the "
+								   "End Of File!"));
+		else
+			gtk_hex_set_cursor(win->gh, byte);
+	}
+	else
+		display_error_dialog(win,
+							 _("You may only give the offset as:\n"
+							   "  - a positive decimal number, or\n"
+							   "  - a hex number, beginning with '0x', or\n"
+							   "  - a '+' or '-' sign, followed by a relative offset"));
+}
+
+static void
+g_hex_goto_init (GHexGoto *self)
+{
+	GtkWidget *ok;
+	GtkWidget *cancel;
+	GtkWidget *wrap;
+	GtkWidget *label;
+
+	g_signal_connect (G_OBJECT (self), "delete-event", G_CALLBACK (delete_event_cb), NULL);
+	g_signal_connect (G_OBJECT (self), "response", G_CALLBACK (g_hex_goto_response), NULL);
+	g_signal_connect (G_OBJECT (self), "show", G_CALLBACK (g_hex_goto_show), NULL);
+
+	self->entry = gtk_entry_new ();
+	g_signal_connect_swapped (G_OBJECT (self->entry),
+	                          "activate", G_CALLBACK(gtk_window_activate_default),
+	                          GTK_WINDOW (self));
+	gtk_widget_show (self->entry);
+
+	ok = gtk_dialog_add_button (GTK_DIALOG (self), _("Goto"), GTK_RESPONSE_ACCEPT);
+	gtk_widget_set_can_default (ok, TRUE);
+	gtk_style_context_add_class (gtk_widget_get_style_context (ok),
+								 GTK_STYLE_CLASS_SUGGESTED_ACTION);
+	gtk_widget_show (ok);
+
+	cancel = gtk_dialog_add_button (GTK_DIALOG (self), _("Cancel"), GTK_RESPONSE_CANCEL);
+	gtk_widget_set_can_default (cancel, TRUE);
+	gtk_widget_show(cancel);
+
+	wrap = g_object_new (GTK_TYPE_BOX,
+						 "orientation", GTK_ORIENTATION_VERTICAL,
+						 "spacing", 5,
+						 "margin", 16,
+						 NULL);
+	gtk_widget_set_halign (wrap, GTK_ALIGN_FILL);
+	gtk_widget_set_valign (wrap, GTK_ALIGN_CENTER);
+	gtk_widget_show (wrap);
+
+	label = gtk_label_new (_("Go to Byte"));
+	gtk_widget_set_halign (label, GTK_ALIGN_START);
+	gtk_widget_set_valign (label, GTK_ALIGN_END);
+	gtk_widget_show (label);
+
+	gtk_box_pack_start (GTK_BOX (wrap), label, FALSE, FALSE, 0);
+	gtk_box_pack_start (GTK_BOX (wrap), self->entry, FALSE, FALSE, 0);
+
+	gtk_box_pack_start (GTK_BOX (gtk_dialog_get_content_area (GTK_DIALOG (self))),
+						wrap, TRUE, TRUE, 0);
+
+	gtk_window_set_default (GTK_WINDOW (self), ok);
+	gtk_window_set_position (GTK_WINDOW( self), GTK_WIN_POS_CENTER_ON_PARENT);
+
+	if (GTK_IS_ACCESSIBLE (gtk_widget_get_accessible (self->entry))) {
+		add_atk_namedesc (self->entry, _("Jump to byte"), _("Enter the byte to jump to"));
+		add_atk_namedesc (ok, _("OK"), _("Jumps to the specified byte"));
+		add_atk_namedesc (cancel, _("Cancel"), _("Closes jump to byte window"));
+	}
+}
+
+GtkWidget *
+g_hex_goto_new (GtkWindow *parent)
+{
+  return g_object_new (G_HEX_TYPE_GOTO,
+					   "use-header-bar", TRUE,
+					   "modal", TRUE,
+					   "transient-for", parent,
+					   "resizable", FALSE,
+					   NULL);
 }
 
 static gint get_search_string(HexDocument *doc, gchar **str)
@@ -582,80 +698,6 @@ static void find_prev_cb(GtkButton *button, FindDialog *dialog)
 	}
 	if(NULL != str)
 		g_free(str);
-}
-
-static void goto_byte_cb(GtkButton *button, GtkWidget *w)
-{
-	guint byte = 2, len, i;
-	gint is_relative = 0;
-	gboolean is_hex;
-	const gchar *byte_str = gtk_entry_get_text(GTK_ENTRY(jump_dialog->int_entry));
-	GHexWindow *win = ghex_window_get_active();
-	
-	if(win == NULL || win->gh == NULL) {
-		display_error_dialog (win,
-							  _("There is no active document to move the "
-								"cursor in!"));
-		return;
-	}
-	
-	len = strlen(byte_str);
-	
-	if(len > 1 && byte_str[0] == '+') {
-		is_relative = 1;
-		byte_str++;
-		len--;
-	} else if(len > 1 && byte_str[0] == '-') {
-		is_relative = -1;
-		byte_str++;
-		len--;
-	}
-	
-	if(len == 0) {
-		display_error_dialog (win, _("No offset has been specified!"));
-		return;
-	}
-
-	is_hex = ((len > 2) && (byte_str[0] == '0') && (byte_str[1] == 'x'));
-
-	if(!is_hex) {
-		for(i = 0; i < len; i++)
-			if(!(byte_str[i] >= '0' && byte_str[i] <= '9')) 
-				break;
-	}
-	else {
-		for(i = 2; i < len; i++)
-			if(!((byte_str[i] >= '0' && byte_str[i] <= '9') ||
-				 (byte_str[i] >= 'A' && byte_str[i] <= 'F') ||
-				 (byte_str[i] >= 'a' && byte_str[i] <= 'f')))
-				break;
-	}
-
-	if((i == len) &&
-	   ((sscanf(byte_str, "0x%x", &byte) == 1) ||
-		(sscanf(byte_str, "%d", &byte) == 1))) {
-		if(is_relative) {
-			if(is_relative == -1 && byte > win->gh->cursor_pos) {
-				display_error_dialog(win,
-								 _("The specified offset is beyond the "
-								" file boundaries!"));
-				return;
-			}
-			byte = byte * is_relative + win->gh->cursor_pos;
-		}
-		if(byte >= win->gh->document->file_size)
-			display_error_dialog(win,
-								 _("Can not position cursor beyond the "
-								   "End Of File!"));
-		else
-			gtk_hex_set_cursor(win->gh, byte);
-	}
-	else
-		display_error_dialog(win,
-							 _("You may only give the offset as:\n"
-							   "  - a positive decimal number, or\n"
-							   "  - a hex number, beginning with '0x', or\n"
-							   "  - a '+' or '-' sign, followed by a relative offset"));
 }
 
 static void replace_next_cb(GtkButton *button, gpointer unused)

@@ -118,16 +118,13 @@ jump_cb (GSimpleAction *action,
          GVariant *value,
          GHexWindow *window)
 {
-	if(!jump_dialog)
-		jump_dialog = create_jump_dialog();
+	GtkWidget *dialog;
 
-	if(!gtk_widget_get_visible(jump_dialog->window)) {
-		gtk_window_set_position (GTK_WINDOW(jump_dialog->window), GTK_WIN_POS_MOUSE);
-		gtk_window_set_default(GTK_WINDOW(jump_dialog->window), jump_dialog->ok);
-		gtk_widget_show(jump_dialog->window);
-		gtk_widget_grab_focus(jump_dialog->int_entry);
-	}
-	raise_and_focus_widget(jump_dialog->window);
+	dialog = g_hex_goto_new (GTK_WINDOW (window));
+
+	gtk_widget_show (dialog);
+
+	raise_and_focus_widget (dialog);
 }
 
 void
