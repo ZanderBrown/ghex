@@ -65,6 +65,8 @@ ghex_sources = [
   'find.h',
   'goto.c',
   'goto.h',
+  'replace.c',
+  'replace.h',
   'ghex-window.c',
   'ghex-window.h',
   'hex-dialog.c',

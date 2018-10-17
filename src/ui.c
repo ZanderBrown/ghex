@@ -914,8 +914,7 @@ display_info_dialog (GHexWindow *win, const gchar *msg, ...)
 void
 update_dialog_titles()
 {
-	if(replace_dialog)
-		create_dialog_title(replace_dialog->window, _("GHex (%s): Find & Replace Data"));
+	// TODO: Remove
 }
 
 void

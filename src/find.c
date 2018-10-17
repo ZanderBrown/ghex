@@ -102,7 +102,6 @@ g_hex_find_response (GHexFind *self, gint res, gpointer data)
 		g_free(str);
 }
 
-
 static void
 g_hex_find_init (GHexFind *self)
 {

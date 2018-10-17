@@ -37,10 +37,6 @@ static gint advanced_find_delete_event_cb(GtkWidget *w, GdkEventAny *e,
 										  AdvancedFindDialog *dialog);
 static void advanced_find_close_cb(GtkWidget *w, AdvancedFindDialog *dialog);
 
-static void replace_next_cb(GtkButton *button, gpointer);
-static void replace_one_cb(GtkButton *button, gpointer);
-static void replace_all_cb(GtkButton *button, gpointer);
-
 static void advanced_find_add_add_cb(GtkButton *button,
 									 AdvancedFind_AddDialog *dialog);
 static void advanced_find_add_cb(GtkButton *button, AdvancedFindDialog *);
@@ -48,9 +44,6 @@ static void advanced_find_delete_cb(GtkButton *button, AdvancedFindDialog *dialo
 static void advanced_find_next_cb(GtkButton *button, AdvancedFindDialog *dialog);
 static void advanced_find_prev_cb(GtkButton *button, AdvancedFindDialog *dialog);
 
-
-FindDialog    *find_dialog = NULL;
-ReplaceDialog *replace_dialog = NULL;
 
 /* basic structure to hold private information to be stored in the
  * gtk list.
@@ -248,80 +241,6 @@ void delete_advanced_find_dialog(AdvancedFindDialog *dialog)
 	g_free(dialog);
 }
 
-ReplaceDialog *create_replace_dialog()
-{
-	ReplaceDialog *dialog;
-	GtkWidget *frame;
-
-	dialog = g_new0(ReplaceDialog, 1);
-
-	dialog->window = gtk_dialog_new();
-	g_signal_connect(G_OBJECT(dialog->window), "delete_event",
-					 G_CALLBACK(delete_event_cb), dialog->window);
-	
-	create_dialog_title(dialog->window, _("GHex (%s): Find & Replace Data"));
-	
-	dialog->f_doc = hex_document_new();
-	dialog->f_gh = create_hex_view(dialog->f_doc);
-	frame = gtk_frame_new(_("Find String"));
-	gtk_container_add(GTK_CONTAINER(frame), dialog->f_gh);
-	gtk_box_pack_start(GTK_BOX(gtk_dialog_get_content_area(GTK_DIALOG(dialog->window))), frame,
-					   TRUE, TRUE, 0);
-	gtk_widget_show(frame);
-	gtk_widget_show(dialog->f_gh);
-	
-	dialog->r_doc = hex_document_new();
-	dialog->r_gh = create_hex_view(dialog->r_doc);
-	frame = gtk_frame_new(_("Replace With"));
-	gtk_container_add(GTK_CONTAINER(frame), dialog->r_gh);
-	gtk_box_pack_start(GTK_BOX(gtk_dialog_get_content_area(GTK_DIALOG(dialog->window))), frame,
-					   TRUE, TRUE, 0);
-	gtk_widget_show(frame);
-	gtk_widget_show(dialog->r_gh);
-	
-	dialog->next = gtk_dialog_add_button (GTK_DIALOG (dialog->window),
-										  _("Find next"),
-										  GTK_RESPONSE_APPLY);
-	g_signal_connect (G_OBJECT (dialog->next),
-					  "clicked", G_CALLBACK(replace_next_cb),
-					  NULL);
-
-	dialog->replace = gtk_dialog_add_button (GTK_DIALOG (dialog->window),
-											 _("Replace"),
-											 GTK_RESPONSE_APPLY);
-	g_signal_connect (G_OBJECT (dialog->replace),
-					  "clicked", G_CALLBACK(replace_one_cb),
-					  NULL);
-
-	dialog->replace_all= gtk_dialog_add_button (GTK_DIALOG (dialog->window),
-												_("Replace _All"),
-												GTK_RESPONSE_APPLY);
-	g_signal_connect (G_OBJECT (dialog->replace_all),
-					  "clicked", G_CALLBACK(replace_all_cb),
-					  NULL);
-
-	dialog->close = gtk_dialog_add_button (GTK_DIALOG (dialog->window),
-										  _("Cancel"),
-										  GTK_RESPONSE_CANCEL);
-	g_signal_connect (G_OBJECT (dialog->close),
-					  "clicked", G_CALLBACK(cancel_cb),
-					  dialog->window);
-
-	gtk_container_set_border_width(GTK_CONTAINER(gtk_dialog_get_content_area(GTK_DIALOG(dialog->window))), 2);
-	gtk_box_set_spacing(GTK_BOX(gtk_dialog_get_content_area(GTK_DIALOG(dialog->window))), 2);
-
-	if (GTK_IS_ACCESSIBLE(gtk_widget_get_accessible(dialog->f_gh))) {
-		add_atk_namedesc (dialog->f_gh, _("Find Data"), _("Enter the hex data or ASCII data to search for"));
-		add_atk_namedesc (dialog->r_gh, _("Replace Data"), _("Enter the hex data or ASCII data to replace with"));
-		add_atk_namedesc (dialog->next, _("Find next"), _("Finds the next occurrence of the search string"));
-		add_atk_namedesc (dialog->replace, _("Replace"), _("Replaces the search string with the replace string"));
-		add_atk_namedesc (dialog->replace_all, _("Replace All"), _("Replaces all occurrences of the search string with the replace string"));
-		add_atk_namedesc (dialog->close, _("Cancel"), _("Closes find and replace data window"));
-	}
-
-	return dialog;
-}
-
 static gint advanced_find_delete_event_cb(GtkWidget *w, GdkEventAny *e,
 										  AdvancedFindDialog *dialog)
 {
@@ -333,137 +252,6 @@ static gint advanced_find_delete_event_cb(GtkWidget *w, GdkEventAny *e,
 static void advanced_find_close_cb(GtkWidget *w, AdvancedFindDialog *dialog)
 {
 	gtk_widget_hide(dialog->window);
-}
-
-static void replace_next_cb(GtkButton *button, gpointer unused)
-{
-	GtkHex *gh;
-	guint offset, str_len;
-	gchar *str = NULL;
-	GHexWindow *win = ghex_window_get_active();
-		
-	if(win == NULL || win->gh == NULL) {
-		display_error_dialog (win, _("There is no active document to search!"));
-		return;
-	}
-	
-	gh = win->gh;
-
-	if((str_len = get_search_string(replace_dialog->f_doc, &str)) == 0) {
-		display_error_dialog (win, _("There is no string to search for!"));
-		return;
-	}
-
-	if(hex_document_find_forward(gh->document,
-								 gh->cursor_pos+1, (guchar *) str, str_len, &offset))
-		gtk_hex_set_cursor(gh, offset);
-	else {
-		display_info_dialog(win, _("String was not found!\n"));
-		ghex_window_flash(win, _("End Of File reached"));
-	}
-
-	if(NULL != str)
-		g_free(str);
-}
-
-static void replace_one_cb(GtkButton *button, gpointer unused)
-{
-	gchar *find_str = NULL, *rep_str = NULL;
-	guint find_len, rep_len, offset;
-	GtkHex *gh;
-	HexDocument *doc;
-	GHexWindow *win = ghex_window_get_active();
-	
-	if(win == NULL || win->gh == NULL) {
-		display_error_dialog (win, _("There is no active buffer to replace data in!"));
-		return;
-	}
-	
-	gh = win->gh;
-
-	doc = win->gh->document;
-	
-	if((find_len = get_search_string(replace_dialog->f_doc, &find_str)) == 0) {
-		display_error_dialog (win, _("There is no string to search for!"));
-		return;
-	}
-	rep_len = get_search_string(replace_dialog->r_doc, &rep_str);
-	
-	if(find_len > doc->file_size - gh->cursor_pos)
-		goto clean_up;
-	
-	if(hex_document_compare_data(doc, (guchar *) find_str, gh->cursor_pos, find_len) == 0)
-		hex_document_set_data(doc, gh->cursor_pos,
-							  rep_len, find_len, (guchar *) rep_str, TRUE);
-	
-	if(hex_document_find_forward(doc, gh->cursor_pos + rep_len, (guchar *) find_str, find_len,
-								 &offset))
-		gtk_hex_set_cursor(gh, offset);
-	else {
-		display_info_dialog(win, _("End Of File reached!"));
-		ghex_window_flash(win, _("End Of File reached!"));
-	}
-
- clean_up:
-	if(NULL != find_str)
-		g_free(find_str);
-	if(NULL != rep_str)
-		g_free(rep_str);
-}
-
-static void replace_all_cb(GtkButton *button, gpointer unused)
-{
-	gchar *find_str = NULL, *rep_str = NULL, *flash;
-	guint find_len, rep_len, offset, count, cursor_pos;
-	GtkHex *gh;
-	HexDocument *doc;
-	GHexWindow *win = ghex_window_get_active();
-	
-	if(win == NULL || win->gh == NULL) {
-		display_error_dialog (win, _("There is no active document to replace data in!"));
-		return;
-	}
-	
-	gh = win->gh;
-
-	doc = gh->document;
-	
-	if((find_len = get_search_string(replace_dialog->f_doc, &find_str)) == 0) {
-		display_error_dialog (win, _("There is no string to search for!"));
-		return;
-	}
-	rep_len = get_search_string(replace_dialog->r_doc, &rep_str);
-
-	if(find_len > doc->file_size - gh->cursor_pos)
-		goto clean_up;
-	
-	count = 0;
-	cursor_pos = 0;  
-
-	while(hex_document_find_forward(doc, cursor_pos, (guchar *) find_str, find_len,
-									&offset)) {
-		hex_document_set_data(doc, offset, rep_len, find_len, (guchar *) rep_str, TRUE);
-		cursor_pos = offset + rep_len;
-		count++;
-	}
-	
-	gtk_hex_set_cursor(gh, MIN(offset, doc->file_size));  
-
-	if(count == 0) {
-		display_info_dialog(win, _("No occurrences were found."));
-	}
-	
-	flash = g_strdup_printf(ngettext("Replaced %d occurrence.",
-									 "Replaced %d occurrences.",
-									 count), count);
-	ghex_window_flash(win, flash);
-	g_free(flash);
-
- clean_up:
-	if(NULL != find_str)
-		g_free(find_str);
-	if(NULL != rep_str)
-		g_free(rep_str);
 }
 
 static void advanced_find_add_add_cb(GtkButton *button,

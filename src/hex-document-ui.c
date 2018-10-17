@@ -31,6 +31,7 @@
 #include "findreplace.h"
 #include "find.h"
 #include "goto.h"
+#include "replace.h"
 #include "ui.h"
 
 void
@@ -102,15 +103,13 @@ replace_cb (GSimpleAction *action,
             GVariant *value,
             GHexWindow *window)
 {
-	if(!replace_dialog)
-		replace_dialog = create_replace_dialog();
+	GtkWidget *dialog;
 
-	if(!gtk_widget_get_visible(replace_dialog->window)) {
-		gtk_window_set_position (GTK_WINDOW(replace_dialog->window), GTK_WIN_POS_MOUSE);
-		gtk_window_set_default(GTK_WINDOW(replace_dialog->window), replace_dialog->next);
-		gtk_widget_show(replace_dialog->window);
-	}
-	raise_and_focus_widget(replace_dialog->window);
+	dialog = g_hex_replace_new (GTK_WINDOW (window));
+
+	gtk_widget_show (dialog);
+
+	raise_and_focus_widget (dialog);
 }
 
 void

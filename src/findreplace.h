@@ -32,30 +32,6 @@
 
 G_BEGIN_DECLS
 
-typedef struct _FindDialog FindDialog;
-typedef struct _ReplaceDialog ReplaceDialog;
-
-struct _ReplaceDialog {
-	GtkWidget *window;
-	GtkWidget *f_gh, *r_gh;
-	HexDocument *f_doc, *r_doc;
-	GtkWidget *replace, *replace_all, *next, *close;
-	
-	GtkHex_AutoHighlight *auto_highlight;
-}; 
-
-struct _FindDialog {
-	GtkWidget *window;
-	GtkWidget *frame;
-	GtkWidget *vbox;
-	GtkWidget *hbox;
-	HexDocument *f_doc;
-	GtkWidget *f_gh;
-	GtkWidget *f_next, *f_prev, *f_close;
-	
-	GtkHex_AutoHighlight *auto_highlight;
-};
-
 typedef struct _AdvancedFindDialog AdvancedFindDialog;
 typedef struct _AdvancedFind_AddDialog AdvancedFind_AddDialog;
 
@@ -82,11 +58,7 @@ struct _AdvancedFind_AddDialog {
 	GtkWidget *colour;
 };
 
-extern ReplaceDialog  *replace_dialog;
-
-
 /* creation of dialogs */
-ReplaceDialog      *create_replace_dialog      (void);
 AdvancedFindDialog *create_advanced_find_dialog(GHexWindow *parent);
 void               delete_advanced_find_dialog (AdvancedFindDialog *dialog);
 
