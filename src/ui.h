@@ -70,17 +70,13 @@ void insert_mode_cb (GSimpleAction *action, GVariant *value, GHexWindow *window)
 void prefs_cb (GSimpleAction *action, GVariant *value, GHexWindow *window);
 
 /* View menu */
-void add_view_cb (GtkAction *action, gpointer user_data);
-void remove_view_cb (GtkAction *action, gpointer user_data);
-void group_data_cb (GtkAction *action, GtkRadioAction *current, gpointer user_data);
-void set_byte_cb (GtkAction *action, gpointer user_data);
-void set_word_cb (GtkAction *action, gpointer user_data);
-void set_long_cb (GtkAction *action, gpointer user_data);
+void add_view_cb (GSimpleAction *action, GVariant *value, GHexWindow *window);
+void group_data_cb (GSimpleAction *action, GVariant *value, GHexWindow *window);
 
 /* Windows menu */
-void character_table_cb (GtkAction *action, gpointer user_data);
-void converter_cb (GtkAction *action, gpointer user_data);
-void type_dialog_cb (GtkAction *action, gpointer user_data);
+void character_table_cb (GSimpleAction *action, GVariant *value, GHexWindow *window);
+void converter_cb (GSimpleAction *action, GVariant *value, GHexWindow *window);
+void type_dialog_cb (GSimpleAction *action, GVariant *value, GHexWindow *window);
 
 /* Help menu */
 void help_cb (GSimpleAction *action, GVariant *value, GHexWindow *window);

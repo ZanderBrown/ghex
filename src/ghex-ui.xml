@@ -3,19 +3,9 @@
     <menu action="View">
       <menuitem action="ViewAddView"/>
       <menuitem action="ViewRemoveView"/>
-      <separator/>
-      <menu action="GroupDataAs">
-        <menuitem action="Bytes"/>
-        <menuitem action="Words"/>
-        <menuitem action="Longwords"/>
-      </menu>
     </menu>
     <menu action="Windows">
       <placeholder name="OpenDocuments"/>
-      <separator/>
-      <menuitem action="CharacterTable"/>
-      <menuitem action="Converter"/>
-      <menuitem action="TypeDialog"/>
     </menu>
   </menubar>
 </ui>

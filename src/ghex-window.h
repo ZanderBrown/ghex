@@ -51,6 +51,8 @@ struct _GHexWindow
     GtkWidget *contents;
     GtkWidget *statusbar;
     GtkWidget *statusbar_insert_mode;
+    GtkWidget *statusbar_display_mode;
+    GtkWidget *statusbar_display_mode_btn;
     guint      statusbar_tooltip_id;
 
     GtkActionGroup *action_group;

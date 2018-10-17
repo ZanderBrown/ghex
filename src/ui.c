@@ -637,14 +637,20 @@ insert_mode_cb (GSimpleAction *action,
 }
 
 void
-character_table_cb (GtkAction *action,
-                    gpointer   user_data)
+character_table_cb (GSimpleAction *action,
+                    GVariant *value,
+                    GHexWindow *window)
 {
     GHexWindow *win;
-    gboolean active;
+    GVariant   *state;
+    gboolean    active;
 
-    win = GHEX_WINDOW (user_data);
-    active = gtk_toggle_action_get_active (GTK_TOGGLE_ACTION (action));
+    win = GHEX_WINDOW (window);
+
+    state = g_action_get_state (G_ACTION (action));
+    active = !g_variant_get_boolean (state);
+    state = g_variant_new_boolean (active);
+    g_simple_action_set_state (action, state);
 
     if (!char_table)
         char_table = create_char_table ();
@@ -664,14 +670,20 @@ character_table_cb (GtkAction *action,
 }
 
 void
-converter_cb (GtkAction *action,
-              gpointer   user_data)
+converter_cb (GSimpleAction *action,
+              GVariant *value,
+              GHexWindow *window)
 {
     GHexWindow *win;
+    GVariant   *state;
     gboolean active;
 
-    win = GHEX_WINDOW (user_data);
-    active = gtk_toggle_action_get_active (GTK_TOGGLE_ACTION (action));
+    win = GHEX_WINDOW (window);
+
+    state = g_action_get_state (G_ACTION (action));
+    active = !g_variant_get_boolean (state);
+    state = g_variant_new_boolean (active);
+    g_simple_action_set_state (action, state);
 
     if (!converter)
         converter = create_converter ();
@@ -696,14 +708,20 @@ converter_cb (GtkAction *action,
 }
 
 void
-type_dialog_cb (GtkAction *action,
-                gpointer   user_data)
+type_dialog_cb (GSimpleAction *action,
+                GVariant *value,
+                GHexWindow *window)
 {
     GHexWindow *win;
-    gboolean active;
+    GVariant   *state;
+    gboolean    active;
 
-    win = GHEX_WINDOW (user_data);
-    active = gtk_toggle_action_get_active (GTK_TOGGLE_ACTION (action));
+    win = GHEX_WINDOW (window);
+
+    state = g_action_get_state (G_ACTION (action));
+    active = !g_variant_get_boolean (state);
+    state = g_variant_new_boolean (active);
+    g_simple_action_set_state (action, state);
 
     if (!win->dialog)
         return;
@@ -718,18 +736,30 @@ type_dialog_cb (GtkAction *action,
 }
 
 void
-group_data_cb (GtkAction      *action,
-               GtkRadioAction *current,
-               gpointer        user_data)
+group_data_cb (GSimpleAction *action,
+               GVariant *value,
+               GHexWindow *window)
 {
-    GHexWindow *win;
-    gint value;
+    const gchar *arg;
+    guint        mode;
 
-    win = GHEX_WINDOW (user_data);
-    value = gtk_radio_action_get_current_value (current);
+    mode = GROUP_BYTE;
+    arg = g_variant_get_string (value, NULL);
 
-    if (win->gh != NULL)
-        gtk_hex_set_group_type (win->gh, value);
+    if (g_strcmp0(arg, "word") == 0) {
+        mode = GROUP_WORD;
+        gtk_label_set_text (GTK_LABEL (window->statusbar_display_mode), "Word");
+    } else if (g_strcmp0(arg, "longword") == 0) {
+        mode = GROUP_LONG;
+        gtk_label_set_text (GTK_LABEL (window->statusbar_display_mode), "Longword");
+    } else {
+        gtk_label_set_text (GTK_LABEL (window->statusbar_display_mode), "Byte");
+    }
+
+    g_simple_action_set_state (action, value);
+
+    if (window->gh != NULL)
+        gtk_hex_set_group_type (window->gh, mode);
 }
 
 void
@@ -918,10 +948,11 @@ update_dialog_titles()
 }
 
 void
-add_view_cb (GtkAction *action,
-             gpointer   user_data)
+add_view_cb (GSimpleAction *action,
+             GVariant *value,
+             GHexWindow *window)
 {
-	GHexWindow *win = GHEX_WINDOW(user_data);
+	GHexWindow *win = GHEX_WINDOW(window);
 	GtkWidget *newwin;
 
 	if(win->gh == NULL)
@@ -930,14 +961,5 @@ add_view_cb (GtkAction *action,
 	newwin = ghex_window_new_from_doc (GTK_APPLICATION (g_application_get_default ()),
 	                                   win->gh->document);
 	gtk_widget_show(newwin);
-}
-
-void
-remove_view_cb (GtkAction *action,
-                gpointer   user_data)
-{
-	GHexWindow *win = GHEX_WINDOW(user_data);
-
-	ghex_window_close(win);
 }
 

@@ -202,20 +202,24 @@ ghex_window_set_toggle_action_active (GHexWindow *win,
                                       const char *name,
                                       gboolean    active)
 {
-    GtkAction *action;
+    GAction  *action;
+    GVariant *state;
 
-    action = gtk_action_group_get_action (win->action_group, name);
-    gtk_toggle_action_set_active (GTK_TOGGLE_ACTION (action), active);
+    action = g_action_map_lookup_action (G_ACTION_MAP (win), name);
+    state = g_variant_new_boolean (!active);
+    g_simple_action_set_state (G_SIMPLE_ACTION (action), state);
 }
 
 static gboolean
 ghex_window_get_toggle_action_active (GHexWindow *win,
                                       const char *name)
 {
-    GtkAction *action;
+    GAction *action;
+    GVariant *state;
 
-    action = gtk_action_group_get_action (win->action_group, name);
-    return gtk_toggle_action_get_active (GTK_TOGGLE_ACTION (action));
+    action = g_action_map_lookup_action (G_ACTION_MAP (win), name);
+    state = g_action_get_state (action);
+    return g_variant_get_boolean (state);
 }
 
 void
@@ -227,7 +231,11 @@ ghex_window_set_sensitivity (GHexWindow *win)
     win->undo_sens = (allmenus && (win->gh->document->undo_top != NULL));
     win->redo_sens = (allmenus && (win->gh->document->undo_stack != NULL && win->gh->document->undo_top != win->gh->document->undo_stack));
 
-    ghex_window_set_action_visible (win, "View", allmenus);
+    act = g_action_map_lookup_action (G_ACTION_MAP (win), "open-view");
+    g_simple_action_set_enabled (G_SIMPLE_ACTION (act), allmenus);
+    act = g_action_map_lookup_action (G_ACTION_MAP (win), "group");
+    g_simple_action_set_enabled (G_SIMPLE_ACTION (act), allmenus);
+    gtk_widget_set_visible (win->statusbar_display_mode_btn, allmenus);
 
     /* File menu */
     act = g_action_map_lookup_action (G_ACTION_MAP (win), "close");
@@ -392,6 +400,19 @@ static const GActionEntry gaction_entries [] = {
     // Insert/overwrite data
     { "insert", NULL, NULL, "false", G_CALLBACK (insert_mode_cb) },
 
+    // Group data by 8/16/32 bits
+    { "group", NULL, "s", "'byte'", G_CALLBACK (group_data_cb) },
+
+    // Show the character table
+    { "char-table", NULL, NULL, "false", G_CALLBACK (character_table_cb) },
+    // Open base conversion dialog
+    { "base-tool", NULL, NULL, "false", G_CALLBACK (converter_cb) },
+    // Show the type conversion dialog in the edit window
+    { "type-tool", NULL, NULL, "false", G_CALLBACK (type_dialog_cb) },
+
+    // Add a new view to the buffer
+    { "open-view", G_CALLBACK (add_view_cb) },
+
     // Configure the application
     { "prefs", G_CALLBACK (prefs_cb) },
     // Help on this application
@@ -406,43 +427,7 @@ static const GActionEntry gaction_entries [] = {
 
 /* Normal items */
 static const GtkActionEntry action_entries [] = {
-    { "File", NULL, N_("_File") },
-    { "Edit", NULL, N_("_Edit") },
-    { "View", NULL, N_("_View") },
-    { "GroupDataAs", NULL, N_("_Group Data As") }, // View submenu
     { "Windows", NULL, N_("_Windows") },
-
-    /* View menu */
-    { "ViewAddView", NULL, N_("_Add View"), NULL,
-      N_("Add a new view to the buffer"),
-      G_CALLBACK (add_view_cb) },
-    { "ViewRemoveView", NULL, N_("_Remove View"), NULL,
-      N_("Remove the current view of the buffer"),
-      G_CALLBACK (remove_view_cb) }
-};
-
-/* Toggle items */
-static const GtkToggleActionEntry toggle_entries[] = {
-    /* Windows menu */
-    { "CharacterTable", NULL, N_("Character _Table"), NULL,
-      N_("Show the character table"),
-      G_CALLBACK (character_table_cb), FALSE },
-    { "Converter", NULL, N_("_Base Converter"), NULL,
-      N_("Open base conversion dialog"),
-      G_CALLBACK (converter_cb), FALSE },
-    { "TypeDialog", NULL, N_("Type Conversion _Dialog"), NULL,
-      N_("Show the type conversion dialog in the edit window"),
-      G_CALLBACK (type_dialog_cb), TRUE }
-};
-
-/* Radio items in View -> Group Data As */
-static GtkRadioActionEntry group_data_entries[] = {
-    { "Bytes", NULL, N_("_Bytes"), NULL,
-      N_("Group data by 8 bits"), GROUP_BYTE },
-    { "Words", NULL, N_("_Words"), NULL,
-      N_("Group data by 16 bits"), GROUP_WORD },
-    { "Longwords", NULL, N_("_Longwords"), NULL,
-      N_("Group data by 32 bits"), GROUP_LONG }
 };
 
 static void
@@ -529,6 +514,7 @@ ghex_window_constructor (GType                  type,
     GtkWidget  *header;
     GtkWidget  *menubar;
     GtkWidget  *btn;
+    GtkWidget  *box;
     GtkWidget  *image;
     GMenu      *appmenu;
     GMenu      *section;
@@ -558,14 +544,6 @@ ghex_window_constructor (GType                  type,
     gtk_action_group_add_actions (window->action_group, action_entries,
                                   G_N_ELEMENTS (action_entries),
                                   window);
-    gtk_action_group_add_toggle_actions (window->action_group, toggle_entries,
-                                         G_N_ELEMENTS (toggle_entries),
-                                         window);
-    gtk_action_group_add_radio_actions (window->action_group, group_data_entries,
-                                        G_N_ELEMENTS (group_data_entries),
-                                        GROUP_BYTE,
-                                        G_CALLBACK (group_data_cb),
-                                        window);
     gtk_ui_manager_insert_action_group (window->ui_manager,
                                         window->action_group, 0);
     gtk_window_add_accel_group (GTK_WINDOW (window),
@@ -601,6 +579,32 @@ ghex_window_constructor (GType                  type,
     window->statusbar_insert_mode = gtk_label_new ("OVR");
     gtk_box_pack_end (GTK_BOX (window->statusbar), window->statusbar_insert_mode, FALSE, TRUE, 0);
     gtk_widget_show (window->statusbar_insert_mode);
+
+    section = g_menu_new ();
+    g_menu_append (section, _("Byte"), "win.group::byte");
+    g_menu_append (section, _("Word"), "win.group::word");
+    g_menu_append (section, _("Longword"), "win.group::longword");
+
+    window->statusbar_display_mode_btn = gtk_menu_button_new ();
+    gtk_menu_button_set_menu_model (GTK_MENU_BUTTON (window->statusbar_display_mode_btn),
+                                    G_MENU_MODEL (section));
+    gtk_button_set_relief (GTK_BUTTON (window->statusbar_display_mode_btn),
+                           GTK_RELIEF_NONE);
+    box = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, 5);
+    window->statusbar_display_mode = gtk_label_new (_("Byte"));
+    gtk_box_pack_start (GTK_BOX (box), window->statusbar_display_mode, FALSE, FALSE, 0);
+    gtk_widget_show (window->statusbar_display_mode);
+    image = gtk_image_new_from_icon_name ("pan-down-symbolic", GTK_ICON_SIZE_MENU);
+    gtk_box_pack_end (GTK_BOX (box), image, FALSE, FALSE, 0);
+    gtk_widget_show (image);
+    gtk_container_add (GTK_CONTAINER (window->statusbar_display_mode_btn), box);
+    gtk_widget_show (box);
+    gtk_widget_show (window->statusbar_display_mode_btn);
+    gtk_box_pack_end (GTK_BOX (window->statusbar),
+                      window->statusbar_display_mode_btn,
+                      FALSE,
+                      FALSE,
+                      5);
 
 
     gtk_container_add (GTK_CONTAINER (window), window->vbox);
@@ -638,6 +642,13 @@ ghex_window_constructor (GType                  type,
     g_menu_append (section, _("Print..."), "win.print");
     g_menu_append (section, _("Print Preview..."), "win.print-preview");
     g_menu_append_section (appmenu, NULL, G_MENU_MODEL (section));
+
+    section = g_menu_new ();
+    g_menu_append (section, _("Open View"), "win.open-view");
+    g_menu_append (section, _("Character Table"), "win.char-table");
+    g_menu_append (section, _("Base Converter"), "win.base-tool");
+    g_menu_append (section, _("Type Converter"), "win.type-tool");
+    g_menu_append_submenu (appmenu, "Tools", G_MENU_MODEL (section));
 
     section = g_menu_new ();
     g_menu_append (section, _("Preferences"), "win.prefs");
@@ -692,7 +703,7 @@ ghex_window_sync_converter_item(GHexWindow *win, gboolean state)
     wnode = ghex_window_get_list();
     while(wnode) {
         if(GHEX_WINDOW(wnode->data) != win)
-            ghex_window_set_toggle_action_active (GHEX_WINDOW (wnode->data), "Converter", state);
+            ghex_window_set_toggle_action_active (GHEX_WINDOW (wnode->data), "type-tool", state);
         wnode = wnode->next;
     }
 }
@@ -705,7 +716,7 @@ ghex_window_sync_char_table_item(GHexWindow *win, gboolean state)
     wnode = ghex_window_get_list();
     while(wnode) {
         if(GHEX_WINDOW(wnode->data) != win)
-            ghex_window_set_toggle_action_active (GHEX_WINDOW (wnode->data), "CharacterTable", state);
+            ghex_window_set_toggle_action_active (GHEX_WINDOW (wnode->data), "char-table", state);
         wnode = wnode->next;
     }
 }
@@ -731,9 +742,9 @@ ghex_window_new (GtkApplication *application)
                        sizeof (drag_types) / sizeof (drag_types[0]),
                        GDK_ACTION_COPY);
 
-    ghex_window_set_toggle_action_active (win, "Converter",
+    ghex_window_set_toggle_action_active (win, "type-tool",
                                           converter && gtk_widget_get_visible (converter->window));
-    ghex_window_set_toggle_action_active (win, "CharacterTable",
+    ghex_window_set_toggle_action_active (win, "char-table",
                                           char_table && gtk_widget_get_visible (char_table));
 
     ghex_window_set_sensitivity(win);
@@ -796,35 +807,6 @@ ghex_window_new_from_file (GtkApplication *application,
     }
 
     return win;
-}
-
-static void
-ghex_window_sync_group_type(GHexWindow *win)
-{
-    const gchar *group_path;
-
-    if(win->gh == NULL)
-        return;
-
-    switch(win->gh->group_type) {
-    case GROUP_BYTE:
-        group_path = "Bytes";
-        break;
-    case GROUP_WORD:
-        group_path = "Words";
-        break;
-    case GROUP_LONG:
-        group_path = "Longwords";
-        break;
-    default:
-        group_path = NULL;
-        break;
-    }
-
-    if(group_path == NULL)
-        return;
-
-    ghex_window_set_toggle_action_active (win, group_path, TRUE);
 }
 
 void
@@ -927,7 +909,7 @@ ghex_window_load(GHexWindow *win, const gchar *filename)
     win->dialog = hex_dialog_new();
     win->dialog_widget = hex_dialog_getview(win->dialog);
     gtk_box_pack_start(GTK_BOX(vbox), win->dialog_widget, FALSE, FALSE, 4);
-    active = ghex_window_get_toggle_action_active (win, "TypeDialog");
+    active = ghex_window_get_toggle_action_active (win, "type-tool");
     if (active)
     {
       gtk_widget_show(win->dialog_widget);
@@ -961,7 +943,6 @@ ghex_window_load(GHexWindow *win, const gchar *filename)
         window_list = window_list->next;
     }
 
-    ghex_window_sync_group_type(win);
     ghex_window_set_doc_name(win, win->gh->document->path_end);
     ghex_window_set_sensitivity(win);
 
