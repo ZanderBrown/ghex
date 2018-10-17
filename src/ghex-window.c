@@ -1,4 +1,4 @@
-/* -*- Mode: C; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
+/* -*- Mode: C; tab-width: 4; indent-tabs-mode: t; c-basic-offset: 4 -*- */
 /*
  * ghex-window.c: a ghex window
  *
@@ -76,7 +76,7 @@ ghex_window_drag_data_received(GtkWidget *widget,
     else
         newwin = NULL;
 
-    uri = uris_to_open = g_uri_list_extract_uris (gtk_selection_data_get_data (selection_data));
+    uri = uris_to_open = g_uri_list_extract_uris ((gchar *) gtk_selection_data_get_data (selection_data));
     while (*uri) {
         GError *err = NULL;
         gchar *filename = g_filename_from_uri (*uri, NULL, &err);
@@ -124,35 +124,34 @@ gboolean
 ghex_window_close(GHexWindow *win)
 {
 	HexDocument *doc;
-	const GList *window_list;
 
 	if(win->gh == NULL) {
-        gtk_widget_destroy(GTK_WIDGET(win));
-		return FALSE;;
+		gtk_widget_destroy (GTK_WIDGET (win));
+		return FALSE;
 	}
 
 	doc = win->gh->document;
 	
-	if(doc->views->next == NULL) {
-		if(!ghex_window_ok_to_close(win))
+	if (doc->views->next == NULL) {
+		if (!ghex_window_ok_to_close (win))
 			return FALSE;
-	}	
+	}
 
 	/* If we have created the converter window disable the
 	 * "Get cursor value" button
 	 */
 	if (converter_get)
-		gtk_widget_set_sensitive(converter_get, FALSE);
+		gtk_widget_set_sensitive (converter_get, FALSE);
 
-    if (win->advanced_find_dialog)
-        delete_advanced_find_dialog(win->advanced_find_dialog);
+	if (win->advanced_find_dialog)
+		delete_advanced_find_dialog(win->advanced_find_dialog);
 
-    gtk_widget_destroy(GTK_WIDGET(win));
+	gtk_widget_destroy(GTK_WIDGET(win));
 
-    if (doc->views == NULL) /* If we have destroyed the last view */
-      g_object_unref (G_OBJECT (doc));
+	if (doc->views == NULL) /* If we have destroyed the last view */
+		g_object_unref (G_OBJECT (doc));
 
-    return TRUE;
+	return TRUE;
 }
 
 static gboolean 
@@ -414,7 +413,6 @@ ghex_window_constructor (GType                  type,
     GtkWidget  *image;
     GMenu      *appmenu;
     GMenu      *section;
-    GError     *error = NULL;
 
     object = G_OBJECT_CLASS (ghex_window_parent_class)->constructor (type,
                              n_construct_properties,
@@ -586,7 +584,6 @@ GtkWidget *
 ghex_window_new (GtkApplication *application)
 {
     GHexWindow *win;
-    const GList *doc_list;
 
 	static const GtkTargetEntry drag_types[] = {
 		{ "text/uri-list", 0, TARGET_URI_LIST }
@@ -731,7 +728,6 @@ ghex_window_load(GHexWindow *win, const gchar *filename)
     HexDocument *doc;
     GtkWidget *gh;
     GtkWidget *vbox;
-    const GList *window_list;
     gboolean active;
 
     g_return_val_if_fail(win != NULL, FALSE);
@@ -792,105 +788,6 @@ ghex_window_load(GHexWindow *win, const gchar *filename)
     g_signal_emit_by_name(G_OBJECT(gh), "cursor_moved");
    
     return TRUE;
-}
-
-static gchar* 
-encode_xml_and_escape_underscores(gchar *text)
-{
-	GString *str;
-	gint length;
-	const gchar *p;
- 	const gchar *end;
-
-  	g_return_val_if_fail (text != NULL, NULL);
-
-    length = strlen (text);
-
-	str = g_string_new ("");
-
-  	p = text;
-  	end = text + length;
-
-  	while (p != end) {
-        const gchar *next;
-        next = g_utf8_next_char (p);
-
-		switch (*p) {
-        case '_':
-            g_string_append (str, "__");
-            break;
-        case '&':
-            g_string_append (str, "&amp;");
-            break;
-        case '<':
-            g_string_append (str, "&lt;");
-            break;
-        case '>':
-            g_string_append (str, "&gt;");
-            break;
-        case '"':
-            g_string_append (str, "&quot;");
-            break;
-        case '\'':
-            g_string_append (str, "&apos;");
-            break;
-        default:
-            g_string_append_len (str, p, next - p);
-            break;
-        }
-        
-        p = next;
-    }
-    
-	return g_string_free (str, FALSE);
-}
-
-static gchar* 
-encode_xml (const gchar* text)
-{
-	GString *str;
-	gint length;
-	const gchar *p;
- 	const gchar *end;
-
-  	g_return_val_if_fail (text != NULL, NULL);
-
-    length = strlen (text);
-
-	str = g_string_new ("");
-
-  	p = text;
-  	end = text + length;
-
-  	while (p != end) {
-        const gchar *next;
-        next = g_utf8_next_char (p);
-
-		switch (*p) {
-        case '&':
-            g_string_append (str, "&amp;");
-            break;
-        case '<':
-            g_string_append (str, "&lt;");
-            break;
-        case '>':
-            g_string_append (str, "&gt;");
-            break;
-        case '"':
-            g_string_append (str, "&quot;");
-            break;
-        case '\'':
-            g_string_append (str, "&apos;");
-            break;
-        default:
-            g_string_append_len (str, p, next - p);
-            break;
-        }
-        
-        p = next;
-    }
-    
-	return g_string_free (str, FALSE);
 }
 
 const GList *
@@ -1132,53 +1029,51 @@ ghex_window_ok_to_close(GHexWindow *win)
 	GtkWidget *mbox;
 	gint reply;
 	gboolean file_exists;
-    HexDocument *doc;
+	HexDocument *doc;
 
-    if(win->gh == NULL)
-        return TRUE;
+	if (win->gh == NULL)
+		return TRUE;
 
-    doc = win->gh->document;
-    file_exists = ghex_window_path_exists (doc->file_name);
-    if (!hex_document_has_changed(doc) && file_exists)
-        return TRUE;
+	doc = win->gh->document;
+	file_exists = ghex_window_path_exists (doc->file_name);
+	if (!hex_document_has_changed (doc) && file_exists)
+		return TRUE;
 
-	mbox = gtk_message_dialog_new(GTK_WINDOW(win),
-								  GTK_DIALOG_MODAL|GTK_DIALOG_DESTROY_WITH_PARENT,
-								  GTK_MESSAGE_QUESTION,
-								  GTK_BUTTONS_NONE,
-                                  _("File %s has changed since last save.\n"
-                                    "Do you want to save changes?"),
-                                  doc->path_end);
+	mbox = gtk_message_dialog_new (GTK_WINDOW (win),
+								   GTK_DIALOG_MODAL|GTK_DIALOG_DESTROY_WITH_PARENT,
+								   GTK_MESSAGE_QUESTION,
+								   GTK_BUTTONS_NONE,
+								   _("File %s has changed since last save.\n"
+								   "Do you want to save changes?"),
+								   doc->path_end);
 			
-	gtk_dialog_add_button(GTK_DIALOG(mbox), _("Do_n't save"), GTK_RESPONSE_NO);
-	gtk_dialog_add_button(GTK_DIALOG(mbox), _("_Cancel"), GTK_RESPONSE_CANCEL);
-	gtk_dialog_add_button(GTK_DIALOG(mbox), _("_Save"), GTK_RESPONSE_YES);
-	gtk_dialog_set_default_response(GTK_DIALOG(mbox), GTK_RESPONSE_YES);
-	gtk_window_set_resizable(GTK_WINDOW(mbox), FALSE);
+	gtk_dialog_add_button (GTK_DIALOG (mbox), _("Do_n't save"), GTK_RESPONSE_NO);
+	gtk_dialog_add_button (GTK_DIALOG (mbox), _("_Cancel"), GTK_RESPONSE_CANCEL);
+	gtk_dialog_add_button (GTK_DIALOG (mbox), _("_Save"), GTK_RESPONSE_YES);
+	gtk_dialog_set_default_response (GTK_DIALOG (mbox), GTK_RESPONSE_YES);
+	gtk_window_set_resizable (GTK_WINDOW (mbox), FALSE);
 	
-	reply = gtk_dialog_run(GTK_DIALOG(mbox));
+	reply = gtk_dialog_run (GTK_DIALOG (mbox));
 	
-	gtk_widget_destroy(mbox);
+	gtk_widget_destroy (mbox);
 		
-	if(reply == GTK_RESPONSE_YES) {
-		if(!file_exists) {
-			if(!ghex_window_save_as(win)) {
+	if (reply == GTK_RESPONSE_YES) {
+		if (!file_exists) {
+			if (!ghex_window_save_as (win)) {
 				return FALSE;
 			}
-        }
-		else {
-            if(!hex_document_is_writable(doc)) {
-                display_error_dialog (win, _("You don't have the permissions to save the file!"));
-                return FALSE;
-            }
-            else if(!hex_document_write(doc)) {
-                display_error_dialog(win, _("An error occurred while saving file!"));
+		} else {
+			if (!hex_document_is_writable (doc)) {
+				display_error_dialog (win, _("You don't have the permissions to save the file!"));
+				return FALSE;
+			} else if (!hex_document_write (doc)) {
+				display_error_dialog (win, _("An error occurred while saving file!"));
 				return FALSE;
 			}
 		}
-	}
-	else if(reply == GTK_RESPONSE_CANCEL)
+	} else if (reply == GTK_RESPONSE_CANCEL) {
 		return FALSE;
+	}
 
 	return TRUE;
 }
