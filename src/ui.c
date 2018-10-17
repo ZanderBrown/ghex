@@ -35,6 +35,7 @@
 #include "converter.h"
 #include "print.h"
 #include "chartable.h"
+#include "configuration.h"
 
 static void ghex_print(GtkHex *gh, gboolean preview);
 
@@ -933,3 +934,26 @@ add_view_cb (GSimpleAction *action,
 	gtk_widget_show(newwin);
 }
 
+GtkWidget *create_hex_view(HexDocument *doc)
+{
+    GtkWidget *gh = hex_document_add_view(doc);
+
+	gtk_hex_set_group_type(GTK_HEX(gh), def_group_type);
+	if (def_metrics && def_font_desc) {
+		gtk_hex_set_font(GTK_HEX(gh), def_metrics, def_font_desc);
+	}
+	gtk_hex_set_insert_mode(GTK_HEX(gh), TRUE);
+	gtk_hex_set_geometry(GTK_HEX(gh), 16, 4);
+    return gh;
+}
+
+gint get_search_string(HexDocument *doc, gchar **str)
+{
+	guint size = doc->file_size;
+
+	if(size > 0)
+		*str = (gchar *)hex_document_get_data(doc, 0, size);
+	else
+		*str = NULL;
+	return size;
+}

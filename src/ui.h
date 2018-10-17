@@ -83,6 +83,10 @@ void about_cb (GSimpleAction *action, GVariant *value, GHexWindow *window);
 
 void file_list_activated_cb (GtkAction *action, gpointer user_data);
 
+/* tmp utils */
+GtkWidget *create_hex_view(HexDocument *doc);
+gint get_search_string(HexDocument *doc, gchar **str);
+
 G_END_DECLS
 
 #endif /* !__GHEX_UI_H__ */

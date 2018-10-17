@@ -29,6 +29,8 @@
 #include "ghex-window.h"
 #include "gtkhex.h"
 #include "findreplace.h"
+#include "find.h"
+#include "goto.h"
 #include "ui.h"
 
 void
