@@ -32,12 +32,16 @@
 
 G_BEGIN_DECLS
 
+#define G_HEX_TYPE_FIND_ADD (g_hex_find_add_get_type ())
+G_DECLARE_FINAL_TYPE (GHexFindAdd, g_hex_find_add, G_HEX, FIND_ADD, GtkDialog)
+
+GtkWidget *g_hex_find_add_new (GtkWindow *parent);
+
+
 typedef struct _AdvancedFindDialog AdvancedFindDialog;
-typedef struct _AdvancedFind_AddDialog AdvancedFind_AddDialog;
 
 struct _AdvancedFindDialog {
 	GHexWindow *parent;
-	AdvancedFind_AddDialog *addDialog;
 
 	GtkWidget *window;
 	GtkWidget *hbox;
@@ -47,15 +51,6 @@ struct _AdvancedFindDialog {
 	GtkWidget *f_next, *f_prev;
 	GtkWidget *f_new, *f_remove;
 	GtkWidget *f_close;
-};
-
-struct _AdvancedFind_AddDialog {
-	AdvancedFindDialog *parent;
-  
-	GtkWidget *window;
-	GtkWidget *f_gh;
-	HexDocument *f_doc;
-	GtkWidget *colour;
 };
 
 /* creation of dialogs */

@@ -67,12 +67,12 @@ g_hex_find_response (GHexFind *self, gint res, gpointer data)
 	}
 
 	if(win->gh == NULL) {
-		display_error_dialog (win, _("There is no active document to search!"));
+		display_error_dialog (GTK_WIDGET (win), _("There is no active document to search!"));
 		return;
 	}
 
 	if((str_len = get_search_string (self->f_doc, &str)) == 0) {
-		display_error_dialog (win, _("There is no string to search for!"));
+		display_error_dialog (GTK_WIDGET (win), _("There is no string to search for!"));
 		return;
 	}
 

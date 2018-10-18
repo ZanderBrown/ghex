@@ -33,12 +33,89 @@
 #include "gtkhex.h"
 #include "configuration.h"
 
+
+struct _GHexFindAdd
+{
+	GtkDialog    parent;
+
+	GtkWidget   *f_gh;
+	HexDocument *f_doc;
+	GtkWidget   *colour;
+};
+
+G_DEFINE_TYPE (GHexFindAdd, g_hex_find_add, GTK_TYPE_DIALOG)
+
+static void
+g_hex_find_add_class_init (GHexFindAddClass *klass)
+{
+}
+
+static void
+g_hex_find_add_init (GHexFindAdd *self)
+{
+	GtkWidget *wrap;
+	GtkWidget *label;
+	GtkWidget *ok;
+
+	wrap = g_object_new (GTK_TYPE_BOX,
+					 "orientation", GTK_ORIENTATION_VERTICAL,
+					 "spacing", 5,
+					 "margin", 16,
+					 NULL);
+
+	label = gtk_label_new (_("Find"));
+	gtk_widget_set_halign (label, GTK_ALIGN_START);
+	gtk_widget_set_valign (label, GTK_ALIGN_END);
+	gtk_box_pack_start (GTK_BOX (wrap), label, TRUE, TRUE, 0);
+	gtk_widget_show (label);
+
+	self->f_doc = hex_document_new ();
+	self->f_gh = create_hex_view (self->f_doc);
+	gtk_widget_set_vexpand (self->f_gh, TRUE);
+	gtk_widget_set_hexpand (self->f_gh, TRUE);
+	gtk_container_set_border_width (GTK_CONTAINER (self->f_gh), 0);
+	gtk_box_pack_start (GTK_BOX (wrap), self->f_gh, TRUE, TRUE, 0);
+	gtk_widget_show (self->f_gh);
+
+	label = gtk_label_new (_("Hightlight"));
+	gtk_widget_set_halign (label, GTK_ALIGN_START);
+	gtk_widget_set_valign (label, GTK_ALIGN_END);
+	gtk_box_pack_start (GTK_BOX (wrap), label, TRUE, TRUE, 0);
+	gtk_widget_show (label);
+
+	self->colour = gtk_color_button_new ();
+	gtk_widget_set_halign (self->colour, GTK_ALIGN_START);
+	gtk_widget_set_valign (self->colour, GTK_ALIGN_END);
+	gtk_color_chooser_set_use_alpha (GTK_COLOR_CHOOSER (self->colour), FALSE);
+	gtk_box_pack_start (GTK_BOX (wrap), self->colour, FALSE, FALSE, 0);
+	gtk_widget_show (self->colour);
+
+	gtk_box_pack_start (GTK_BOX (gtk_dialog_get_content_area (GTK_DIALOG (self))),
+					    wrap, TRUE, TRUE, 0);
+	gtk_widget_show (wrap);
+
+	ok = gtk_dialog_add_button (GTK_DIALOG (self), _("Done"), GTK_RESPONSE_APPLY);
+	gtk_window_set_default (GTK_WINDOW (self), ok);
+	gtk_dialog_add_button (GTK_DIALOG (self), _("Cancel"), GTK_RESPONSE_CANCEL);
+
+	gtk_window_set_position (GTK_WINDOW (self), GTK_WIN_POS_CENTER_ON_PARENT);
+}
+
+GtkWidget *
+g_hex_find_add_new (GtkWindow *parent)
+{
+  return g_object_new (G_HEX_TYPE_FIND_ADD,
+					   "use-header-bar", TRUE,
+					   "transient-for", parent,
+					   "title", _("Add search"),
+					   NULL);
+}
+
+
 static gint advanced_find_delete_event_cb(GtkWidget *w, GdkEventAny *e,
 										  AdvancedFindDialog *dialog);
 static void advanced_find_close_cb(GtkWidget *w, AdvancedFindDialog *dialog);
 
-static void advanced_find_add_add_cb(GtkButton *button,
-									 AdvancedFind_AddDialog *dialog);
 static void advanced_find_add_cb(GtkButton *button, AdvancedFindDialog *);
 static void advanced_find_delete_cb(GtkButton *button, AdvancedFindDialog *dialog);
 static void advanced_find_next_cb(GtkButton *button, AdvancedFindDialog *dialog);
@@ -55,50 +132,6 @@ typedef struct
 	GtkHex_AutoHighlight *auto_highlight;
 } AdvancedFind_ListData;
 
-static AdvancedFind_AddDialog *create_advanced_find_add_dialog(AdvancedFindDialog *parent)
-{
-	AdvancedFind_AddDialog *dialog = g_new0(AdvancedFind_AddDialog, 1);
-	GtkWidget *button, *frame;
-
-	dialog->window = gtk_dialog_new();
-	gtk_widget_hide(dialog->window);
-	g_signal_connect(G_OBJECT(dialog->window), "delete_event",
-					 G_CALLBACK(delete_event_cb), dialog->window);
-
-	create_dialog_title(dialog->window, _("GHex (%s): Find Data: Add search"));
-
-	dialog->f_doc = hex_document_new();
-	dialog->f_gh = create_hex_view(dialog->f_doc);
-	frame = gtk_frame_new(_("Find String"));
-	gtk_container_add(GTK_CONTAINER(frame), dialog->f_gh);
-	gtk_box_pack_start(GTK_BOX(gtk_dialog_get_content_area(GTK_DIALOG(dialog->window))), frame,
-					   TRUE, TRUE, 0);
-	gtk_widget_show(frame);
-	gtk_widget_show(dialog->f_gh);
-
-	dialog->colour = gtk_color_chooser_widget_new ();
-	gtk_color_chooser_set_use_alpha (GTK_COLOR_CHOOSER (dialog->colour), FALSE);
-	gtk_box_pack_start (GTK_BOX (gtk_dialog_get_content_area (GTK_DIALOG (dialog->window))),
-					    dialog->colour, FALSE, FALSE, 8);
-	gtk_widget_show (dialog->colour);
-
-	button = gtk_dialog_add_button (GTK_DIALOG (dialog->window),
-									_("Add"),
-									GTK_RESPONSE_OK);
-	g_signal_connect (G_OBJECT (button),
-					  "clicked", G_CALLBACK(advanced_find_add_add_cb),
-					  dialog);
-
-	button = gtk_dialog_add_button (GTK_DIALOG (dialog->window),
-									_("Cancel"),
-									GTK_RESPONSE_CANCEL);
-	g_signal_connect (G_OBJECT (button),
-					  "clicked", G_CALLBACK(cancel_cb),
-					  dialog->window);
-
-	return dialog;
-}
-
 AdvancedFindDialog *create_advanced_find_dialog(GHexWindow *parent)
 {
 	AdvancedFindDialog *dialog;
@@ -111,8 +144,6 @@ AdvancedFindDialog *create_advanced_find_dialog(GHexWindow *parent)
 	dialog = g_new0(AdvancedFindDialog, 1);
 
 	dialog->parent = parent;
-
-	dialog->addDialog = create_advanced_find_add_dialog(dialog);
 
 	dialog->window = gtk_dialog_new();
 	g_signal_connect(G_OBJECT(dialog->window), "delete_event",
@@ -212,12 +243,6 @@ AdvancedFindDialog *create_advanced_find_dialog(GHexWindow *parent)
 	return dialog;
 }
 
-static void delete_advanced_find_add_dialog(AdvancedFind_AddDialog *dialog)
-{
-	gtk_widget_destroy(GTK_WIDGET(dialog->window));
-	g_free(dialog);
-}
-
 static gboolean advanced_find_foreachfunc_cb (GtkTreeModel *model,
                                               GtkTreePath  *path,
                                               GtkTreeIter  *iter,
@@ -235,7 +260,6 @@ static gboolean advanced_find_foreachfunc_cb (GtkTreeModel *model,
 
 void delete_advanced_find_dialog(AdvancedFindDialog *dialog)
 {
-	delete_advanced_find_add_dialog(dialog->addDialog);
 	gtk_tree_model_foreach(GTK_TREE_MODEL(dialog->list),
 						   advanced_find_foreachfunc_cb, (gpointer *)dialog->parent->gh);
 	g_free(dialog);
@@ -254,24 +278,17 @@ static void advanced_find_close_cb(GtkWidget *w, AdvancedFindDialog *dialog)
 	gtk_widget_hide(dialog->window);
 }
 
-static void advanced_find_add_add_cb(GtkButton *button,
-									 AdvancedFind_AddDialog *dialog)
-{
-	gtk_dialog_response(GTK_DIALOG(dialog->window), GTK_RESPONSE_OK);
-}
-
 static void advanced_find_add_cb(GtkButton *button, AdvancedFindDialog *dialog)
 {
-	gint ret;
-	if(!gtk_widget_get_visible(dialog->addDialog->window)) {
-		gtk_window_set_position (GTK_WINDOW(dialog->addDialog->window), GTK_WIN_POS_MOUSE);
-		gtk_widget_show(dialog->addDialog->window);
-	}
+	GtkWidget *dlg;
+	gint       ret;
 
-	ret = gtk_dialog_run(GTK_DIALOG(dialog->addDialog->window));
-	gtk_widget_hide(dialog->addDialog->window);
-	if (ret != GTK_RESPONSE_NONE)
-	{
+	dlg = g_hex_find_add_new (GTK_WINDOW (dialog->window));
+
+	gtk_widget_show (dlg);
+	ret = gtk_dialog_run (GTK_DIALOG (dlg));
+
+	if (ret == GTK_RESPONSE_APPLY) {
 		gchar *colour;
 		GdkRGBA rgba;
 		AdvancedFind_ListData *data = g_new0(AdvancedFind_ListData, 1);
@@ -280,22 +297,24 @@ static void advanced_find_add_cb(GtkButton *button, AdvancedFindDialog *dialog)
 		
 		g_return_if_fail (gh != NULL);
 		
-		if((data->str_len = get_search_string(dialog->addDialog->f_doc, &data->str)) == 0) {
-			display_error_dialog (dialog->parent, _("No string to search for!"));
+		if ((data->str_len = get_search_string (G_HEX_FIND_ADD (dlg)->f_doc, &data->str)) == 0) {
+			display_error_dialog (dlg, _("No string to search for!"));
+			gtk_widget_destroy (dlg);
 			return;
 		}
-		gtk_color_chooser_get_rgba (GTK_COLOR_CHOOSER (dialog->addDialog->colour),
-		                                      &rgba);
+		gtk_color_chooser_get_rgba (GTK_COLOR_CHOOSER (G_HEX_FIND_ADD (dlg)->colour), &rgba);
 		colour = gdk_rgba_to_string (&rgba);
-		data->auto_highlight = gtk_hex_insert_autohighlight(gh, data->str, data->str_len, colour);
-		gtk_list_store_append(dialog->list, &iter);
-		gtk_list_store_set(dialog->list, &iter,
-						   0, data->str,
-						   1, colour,
-						   2, data,
-						   -1);
+		data->auto_highlight = gtk_hex_insert_autohighlight (gh, data->str, data->str_len, colour);
+		gtk_list_store_append (dialog->list, &iter);
+		gtk_list_store_set (dialog->list, &iter,
+						    0, data->str,
+						    1, colour,
+						    2, data,
+						    -1);
 		g_free(colour);
 	}
+
+	gtk_widget_destroy (dlg);
 }
 
 static void advanced_find_delete_cb(GtkButton *button, AdvancedFindDialog *dialog)

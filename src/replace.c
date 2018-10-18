@@ -66,12 +66,12 @@ g_hex_replace_response (GHexReplace *self, gint res, gpointer data)
 	}
 
 	if (win == NULL || win->gh == NULL) {
-		display_error_dialog (win, _("There is no active document to search!"));
+		display_error_dialog (GTK_WIDGET (win), _("There is no active document to search!"));
 		return;
 	}
 
 	if ((str_len = get_search_string (self->f_doc, &str)) == 0) {
-		display_error_dialog (win, _("There is no string to search for!"));
+		display_error_dialog (GTK_WIDGET (win), _("There is no string to search for!"));
 		return;
 	}
 
@@ -140,10 +140,8 @@ g_hex_replace_response (GHexReplace *self, gint res, gpointer data)
 
 
   clean_up:
-	if (rep_str)
-		g_free (rep_str);
-	if (str)
-		g_free (str);
+	g_free (rep_str);
+	g_free (str);
 }
 
 static void

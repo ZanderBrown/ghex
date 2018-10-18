@@ -501,7 +501,7 @@ select_display_font_cb(GtkWidget *w, PropertyUI *pui)
 			                       def_font_name);
 		}
 		else
-			display_error_dialog (ghex_window_get_active(),
+			display_error_dialog (GTK_WIDGET (ghex_window_get_active()),
 								  _("Can not open desired font!"));
 	}
 }

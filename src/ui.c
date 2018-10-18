@@ -278,12 +278,12 @@ save_cb (GSimpleAction *action,
 		return;
 
 	if(!hex_document_is_writable(doc)) {
-		display_error_dialog (win, _("You don't have the permissions to save the file!"));
+		display_error_dialog (GTK_WIDGET (win), _("You don't have the permissions to save the file!"));
 		return;
 	}
 
 	if(!hex_document_write(doc))
-		display_error_dialog (win, _("An error occurred while saving file!"));
+		display_error_dialog (GTK_WIDGET (win), _("An error occurred while saving file!"));
 	else {
 		gchar *flash;
 		gchar *gtk_file_name;
@@ -349,7 +349,7 @@ open_cb (GSimpleAction *action,
 				gtk_widget_set_sensitive(converter_get, TRUE);
 		}
 		else
-			display_error_dialog (ghex_window_get_active(), _("Can not open file!"));
+			display_error_dialog (GTK_WIDGET (ghex_window_get_active()), _("Can not open file!"));
 	}
 
 	gtk_widget_destroy(file_sel);
@@ -450,7 +450,7 @@ export_html_cb (GSimpleAction *action,
 		if(*base_name == 0) {
 			g_free(html_path);
 			g_free(base_name);
-			display_error_dialog(win, _("You need to specify a base name for "
+			display_error_dialog(GTK_WIDGET (win), _("You need to specify a base name for "
 										"the HTML files."));
 			return;
 		}
@@ -461,7 +461,7 @@ export_html_cb (GSimpleAction *action,
 			GtkWidget *mbox;
 
 			if(access(check_path, W_OK) != 0) {
-				display_error_dialog(win, _("You don't have the permission to write to the selected path.\n"));
+				display_error_dialog(GTK_WIDGET (win), _("You don't have the permission to write to the selected path.\n"));
 				g_free(html_path);
 				g_free(base_name);
 				g_free(check_path);
@@ -487,7 +487,7 @@ export_html_cb (GSimpleAction *action,
 		}
 		else {
 			if(access(html_path, W_OK) != 0) {
-				display_error_dialog(win, _("You don't have the permission to write to the selected path.\n"));
+				display_error_dialog(GTK_WIDGET (win), _("You don't have the permission to write to the selected path.\n"));
 				g_free(html_path);
 				g_free(base_name);
 				g_free(check_path);
@@ -864,7 +864,7 @@ ghex_print(GtkHex *gh, gboolean preview)
 }
 
 void
-display_error_dialog (GHexWindow *win, const gchar *msg)
+display_error_dialog (GtkWidget *win, const gchar *msg)
 {
 	GtkWidget *error_dlg;
 

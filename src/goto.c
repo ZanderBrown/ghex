@@ -63,7 +63,7 @@ g_hex_goto_response (GHexGoto *self, gint res, gpointer data)
 
 	if (res == GTK_RESPONSE_APPLY) {
 		if(win == NULL || win->gh == NULL) {
-			display_error_dialog (win,
+			display_error_dialog (GTK_WIDGET (win),
 								  _("There is no active document to move the "
 									"cursor in!"));
 			return;
@@ -82,7 +82,7 @@ g_hex_goto_response (GHexGoto *self, gint res, gpointer data)
 		}
 
 		if(len == 0) {
-			display_error_dialog (win, _("No offset has been specified!"));
+			display_error_dialog (GTK_WIDGET (win), _("No offset has been specified!"));
 			return;
 		}
 
@@ -106,21 +106,21 @@ g_hex_goto_response (GHexGoto *self, gint res, gpointer data)
 			(sscanf(byte_str, "%d", &byte) == 1))) {
 			if(is_relative) {
 				if(is_relative == -1 && byte > win->gh->cursor_pos) {
-					display_error_dialog(win,
-									 _("The specified offset is beyond the "
-									" file boundaries!"));
+					display_error_dialog(GTK_WIDGET (win),
+									     _("The specified offset is beyond the "
+									       " file boundaries!"));
 					return;
 				}
 				byte = byte * is_relative + win->gh->cursor_pos;
 			}
 			if(byte >= win->gh->document->file_size)
-				display_error_dialog(win,
-									 _("Can not position cursor beyond the "
-									   "End Of File!"));
+				display_error_dialog (GTK_WIDGET (win),
+									  _("Can not position cursor beyond the "
+									    "End Of File!"));
 			else
 				gtk_hex_set_cursor(win->gh, byte);
 		} else {
-			display_error_dialog(win,
+			display_error_dialog (GTK_WIDGET (win),
 								 _("You may only give the offset as:\n"
 								   "  - a positive decimal number, or\n"
 								   "  - a hex number, beginning with '0x', or\n"

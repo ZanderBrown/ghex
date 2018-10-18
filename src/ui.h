@@ -34,7 +34,7 @@ G_BEGIN_DECLS
 /* various ui convenience functions */
 void create_dialog_title   (GtkWidget *, gchar *);
 gint ask_user              (GtkMessageDialog *);
-void display_error_dialog (GHexWindow *win, const gchar *msg);
+void display_error_dialog (GtkWidget *win, const gchar *msg);
 void display_info_dialog (GHexWindow *win, const gchar *msg, ...);
 void raise_and_focus_widget(GtkWidget *);
 void set_doc_menu_sensitivity(HexDocument *doc);

@@ -993,13 +993,13 @@ ghex_window_save_as(GHexWindow *win)
                     g_free(flash);
                 }
                 else {
-                    display_error_dialog (win, _("Error saving file!"));
+                    display_error_dialog (GTK_WIDGET (win), _("Error saving file!"));
                     ret_val = FALSE;
                 }
                 fclose(file);
             }
             else {
-                display_error_dialog (win, _("Can't open file for writing!"));
+                display_error_dialog (GTK_WIDGET (win), _("Can't open file for writing!"));
                 ret_val = TRUE;
             }
         }
@@ -1064,10 +1064,10 @@ ghex_window_ok_to_close(GHexWindow *win)
 			}
 		} else {
 			if (!hex_document_is_writable (doc)) {
-				display_error_dialog (win, _("You don't have the permissions to save the file!"));
+				display_error_dialog (GTK_WIDGET (win), _("You don't have the permissions to save the file!"));
 				return FALSE;
 			} else if (!hex_document_write (doc)) {
-				display_error_dialog (win, _("An error occurred while saving file!"));
+				display_error_dialog (GTK_WIDGET (win), _("An error occurred while saving file!"));
 				return FALSE;
 			}
 		}
