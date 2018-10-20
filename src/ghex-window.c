@@ -396,8 +396,21 @@ ghex_window_set_contents (GHexWindow *win,
 void
 ghex_window_destroy_contents (GHexWindow *win)
 {
-    gtk_widget_destroy (win->contents);
-    win->contents = NULL;
+	GtkWidget *placeholder;
+
+	if (G_LIKELY (win->contents))
+		gtk_widget_destroy (win->contents);
+	win->contents = NULL;
+
+	placeholder = g_object_new (GTK_TYPE_IMAGE,
+						  "icon-name", "ghex-symbolic",
+						  "pixel-size", 128,
+						  "margin", 16,
+						  "halign", GTK_ALIGN_CENTER,
+						  "valign", GTK_ALIGN_CENTER,
+						  "visible", TRUE,
+						  NULL);
+	ghex_window_set_contents (win, placeholder);
 }
 
 static GObject *
@@ -427,6 +440,7 @@ ghex_window_constructor (GType                  type,
     window->vbox = gtk_box_new (GTK_ORIENTATION_VERTICAL, 0);
 
     window->contents = NULL;
+	ghex_window_destroy_contents (window);
 
     /* Create statusbar */
     window->statusbar = gtk_statusbar_new ();
