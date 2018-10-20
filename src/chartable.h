@@ -26,12 +26,14 @@
 
 #include <gtk/gtk.h>
 
+#include "dialog.h"
+
 G_BEGIN_DECLS
 
 #define G_HEX_TYPE_CHARACTERS (g_hex_characters_get_type ())
-G_DECLARE_FINAL_TYPE (GHexCharacters, g_hex_characters, G_HEX, CHARACTERS, GtkDialog)
+G_DECLARE_FINAL_TYPE (GHexCharacters, g_hex_characters, G_HEX, CHARACTERS, GHexDialog)
 
-GtkWidget *g_hex_characters_new (GtkWindow *parent);
+GtkWidget *g_hex_characters_new (GHexWindow *parent);
 
 G_END_DECLS
 

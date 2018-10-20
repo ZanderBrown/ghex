@@ -27,13 +27,14 @@
 #include <gtk/gtk.h>
 
 #include "ghex-window.h"
+#include "dialog.h"
 
 G_BEGIN_DECLS
 
 #define G_HEX_TYPE_REPLACE (g_hex_replace_get_type ())
-G_DECLARE_FINAL_TYPE (GHexReplace, g_hex_replace, G_HEX, REPLACE, GtkDialog)
+G_DECLARE_FINAL_TYPE (GHexReplace, g_hex_replace, G_HEX, REPLACE, GHexDialog)
 
-GtkWidget *g_hex_replace_new (GtkWindow *parent);
+GtkWidget *g_hex_replace_new (GHexWindow *parent);
 
 G_END_DECLS
 

@@ -34,14 +34,14 @@
 
 struct _GHexFind
 {
-	GtkDialog parent;
+	GHexDialog parent;
 
 	HexDocument *f_doc;
 
 	GtkHex_AutoHighlight *auto_highlight;
 };
 
-G_DEFINE_TYPE (GHexFind, g_hex_find, GTK_TYPE_DIALOG)
+G_DEFINE_TYPE (GHexFind, g_hex_find, G_HEX_TYPE_DIALOG)
 
 #define FIND_PREV 1
 
@@ -55,7 +55,7 @@ g_hex_find_response (GHexFind *self, gint res, gpointer data)
 {
 	guint offset, str_len;
 	gchar *str;
-	GHexWindow *win = GHEX_WINDOW (gtk_window_get_transient_for (GTK_WINDOW (self)));
+	GHexWindow *win = g_hex_dialog_get_window (G_HEX_DIALOG (self));
 	GtkHex *gh = win->gh;
 
 	if (res != GTK_RESPONSE_APPLY && res != FIND_PREV) {

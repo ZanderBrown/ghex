@@ -29,6 +29,7 @@
 #include "gtkhex.h"
 #include "findreplace.h"
 #include "ghex-window.h"
+#include "dialog.h"
 
 G_BEGIN_DECLS
 
@@ -50,9 +51,9 @@ G_DECLARE_FINAL_TYPE (GHexFindAdd, g_hex_find_add, G_HEX, FIND_ADD, GtkDialog)
 GtkWidget *g_hex_find_add_new (GtkWindow *parent);
 
 #define G_HEX_TYPE_FIND_ADVANCED (g_hex_find_advanced_get_type ())
-G_DECLARE_FINAL_TYPE (GHexFindAdvanced, g_hex_find_advanced, G_HEX, FIND_ADVANCED, GtkDialog)
+G_DECLARE_FINAL_TYPE (GHexFindAdvanced, g_hex_find_advanced, G_HEX, FIND_ADVANCED, GHexDialog)
 
-GtkWidget *g_hex_find_advanced_new (GtkWindow *parent);
+GtkWidget *g_hex_find_advanced_new (GHexWindow *parent);
 
 G_END_DECLS
 

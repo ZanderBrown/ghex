@@ -497,12 +497,12 @@ g_hex_find_row_new (GHexFindCondition *cond)
 
 struct _GHexFindAdvanced
 {
-	GtkDialog parent;
+	GHexDialog parent;
 
 	GListStore *store;
 };
 
-G_DEFINE_TYPE (GHexFindAdvanced, g_hex_find_advanced, GTK_TYPE_DIALOG)
+G_DEFINE_TYPE (GHexFindAdvanced, g_hex_find_advanced, G_HEX_TYPE_DIALOG)
 
 static void
 g_hex_find_advanced_class_init (GHexFindAdvancedClass *klass)
@@ -515,7 +515,7 @@ g_hex_find_advanced_response (GHexFindAdvanced *self, gint res, gpointer data)
 	GHexFindCondition *cond;
 	GtkHex_AutoHighlight *hlight;
 	guint i;
-	GHexWindow *win = GHEX_WINDOW (gtk_window_get_transient_for (GTK_WINDOW (self)));
+	GHexWindow *win = g_hex_dialog_get_window (G_HEX_DIALOG (self));
 	i = 0;
 	while ((cond = g_list_model_get_item (G_LIST_MODEL (self->store), i))) {
 		hlight = g_hex_find_condition_get_highlight (cond);
@@ -530,7 +530,7 @@ g_hex_find_advanced_prev (GHexFindAdvanced *self,
                           GHexFindRow      *row)
 {
 	GHexFindCondition *cond;
-	GHexWindow *win = GHEX_WINDOW (gtk_window_get_transient_for (GTK_WINDOW (self)));
+	GHexWindow *win = g_hex_dialog_get_window (G_HEX_DIALOG (self));
 	GtkHex *gh = win->gh;
 	GString *str;
 	guint offset;
@@ -552,7 +552,7 @@ g_hex_find_advanced_next (GHexFindAdvanced *self,
                           GHexFindRow      *row)
 {
 	GHexFindCondition *cond;
-	GHexWindow *win = GHEX_WINDOW (gtk_window_get_transient_for (GTK_WINDOW (self)));
+	GHexWindow *win = g_hex_dialog_get_window (G_HEX_DIALOG (self));
 	GtkHex *gh = win->gh;
 	GString *str;
 	guint offset;
@@ -576,7 +576,7 @@ g_hex_find_advanced_remove (GHexFindAdvanced *self,
 	gint                  index;
 	GHexFindCondition    *cond;
 	GtkHex_AutoHighlight *hlight;
-	GHexWindow *win = GHEX_WINDOW (gtk_window_get_transient_for (GTK_WINDOW (self)));
+	GHexWindow *win = g_hex_dialog_get_window (G_HEX_DIALOG (self));
 
 	cond = g_hex_find_row_get_condition (row);
 	hlight = g_hex_find_condition_get_highlight (cond);
@@ -601,7 +601,7 @@ g_hex_find_advanced_add (GHexFindAdvanced *self)
 		GHexFindCondition *cond;
 		gchar             *colour;
 		GdkRGBA            rgba;
-		GHexWindow *win = GHEX_WINDOW (gtk_window_get_transient_for (GTK_WINDOW (self)));
+		GHexWindow *win = g_hex_dialog_get_window (G_HEX_DIALOG (self));
 		GtkHex            *gh = win->gh;
 		GtkHex_AutoHighlight *highlight;
 		GString           *str;
@@ -735,7 +735,7 @@ g_hex_find_advanced_init (GHexFindAdvanced *self)
 }
 
 GtkWidget *
-g_hex_find_advanced_new (GtkWindow *parent)
+g_hex_find_advanced_new (GHexWindow *parent)
 {
   return g_object_new (G_HEX_TYPE_FIND_ADVANCED,
 					   "use-header-bar", TRUE,

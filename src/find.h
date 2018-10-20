@@ -27,11 +27,12 @@
 #include <gtk/gtk.h>
 
 #include "ghex-window.h"
+#include "dialog.h"
 
 G_BEGIN_DECLS
 
 #define G_HEX_TYPE_FIND (g_hex_find_get_type ())
-G_DECLARE_FINAL_TYPE (GHexFind, g_hex_find, G_HEX, FIND, GtkDialog)
+G_DECLARE_FINAL_TYPE (GHexFind, g_hex_find, G_HEX, FIND, GHexDialog)
 
 GtkWidget *g_hex_find_new (GtkWindow *parent);
 

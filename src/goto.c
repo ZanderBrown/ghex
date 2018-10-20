@@ -34,12 +34,12 @@
 
 struct _GHexGoto
 {
-	GtkDialog parent;
+	GHexDialog parent;
 
 	GtkWidget *entry;
 };
 
-G_DEFINE_TYPE (GHexGoto, g_hex_goto, GTK_TYPE_DIALOG)
+G_DEFINE_TYPE (GHexGoto, g_hex_goto, G_HEX_TYPE_DIALOG)
 
 static void
 g_hex_goto_class_init (GHexGotoClass *klass)
@@ -59,7 +59,7 @@ g_hex_goto_response (GHexGoto *self, gint res, gpointer data)
 	gint is_relative = 0;
 	gboolean is_hex;
 	const gchar *byte_str = gtk_entry_get_text (GTK_ENTRY (self->entry));
-	GHexWindow *win = GHEX_WINDOW (gtk_window_get_transient_for (GTK_WINDOW (self)));
+	GHexWindow *win = g_hex_dialog_get_window (G_HEX_DIALOG (self));
 
 	if (res == GTK_RESPONSE_APPLY) {
 		if(win == NULL || win->gh == NULL) {
@@ -183,7 +183,7 @@ g_hex_goto_init (GHexGoto *self)
 }
 
 GtkWidget *
-g_hex_goto_new (GtkWindow *parent)
+g_hex_goto_new (GHexWindow *parent)
 {
   return g_object_new (G_HEX_TYPE_GOTO,
 					   "use-header-bar", TRUE,

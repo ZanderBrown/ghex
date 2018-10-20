@@ -608,7 +608,7 @@ character_table_cb (GSimpleAction *action,
                     GHexWindow    *window)
 {
 	if (G_LIKELY (!window->characters || !GTK_IS_WIDGET (window->characters))) {
-		window->characters = g_hex_characters_new (GTK_WINDOW (window));
+		window->characters = g_hex_characters_new (window);
 	}
 	gtk_window_present (GTK_WINDOW (window->characters));
 }

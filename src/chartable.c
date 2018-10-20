@@ -72,10 +72,10 @@ static char *ascii_non_printable_label[] = {
 
 struct _GHexCharacters
 {
-	GtkDialog parent;
+	GHexDialog parent;
 };
 
-G_DEFINE_TYPE (GHexCharacters, g_hex_characters, GTK_TYPE_DIALOG)
+G_DEFINE_TYPE (GHexCharacters, g_hex_characters, G_HEX_TYPE_DIALOG)
 
 static void
 g_hex_characters_class_init (GHexCharactersClass *klass)
@@ -91,7 +91,7 @@ g_hex_characters_row_activated (GtkTreeView       *tree,
 	GtkTreeModel *model;
 	GtkTreeIter iter;
 	GtkTreeSelection *selection;
-	GHexWindow *win = GHEX_WINDOW (gtk_window_get_transient_for (GTK_WINDOW (self)));
+	GHexWindow *win = g_hex_dialog_get_window (G_HEX_DIALOG (self));
 	GValue value = { 0 };
 
 	model = gtk_tree_view_get_model (tree);
@@ -194,7 +194,7 @@ g_hex_characters_init (GHexCharacters *self)
 }
 
 GtkWidget *
-g_hex_characters_new (GtkWindow *parent)
+g_hex_characters_new (GHexWindow *parent)
 {
 	return g_object_new (G_HEX_TYPE_CHARACTERS,
 						 "use-header-bar", TRUE,

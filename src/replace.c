@@ -34,13 +34,13 @@
 
 struct _GHexReplace
 {
-	GtkDialog parent;
+	GHexDialog parent;
 
 	GtkWidget *f_gh, *r_gh;
 	HexDocument *f_doc, *r_doc;
 };
 
-G_DEFINE_TYPE (GHexReplace, g_hex_replace, GTK_TYPE_DIALOG)
+G_DEFINE_TYPE (GHexReplace, g_hex_replace, G_HEX_TYPE_DIALOG)
 
 #define REPLACE_FIND 1
 #define REPLACE_REPLACE_ALL 2
@@ -203,7 +203,7 @@ g_hex_replace_init (GHexReplace *self)
 }
 
 GtkWidget *
-g_hex_replace_new (GtkWindow *parent)
+g_hex_replace_new (GHexWindow *parent)
 {
   return g_object_new (G_HEX_TYPE_REPLACE,
 					   "use-header-bar", TRUE,

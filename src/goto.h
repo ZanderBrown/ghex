@@ -27,13 +27,14 @@
 #include <gtk/gtk.h>
 
 #include "ghex-window.h"
+#include "dialog.h"
 
 G_BEGIN_DECLS
 
 #define G_HEX_TYPE_GOTO (g_hex_goto_get_type ())
-G_DECLARE_FINAL_TYPE (GHexGoto, g_hex_goto, G_HEX, GOTO, GtkDialog)
+G_DECLARE_FINAL_TYPE (GHexGoto, g_hex_goto, G_HEX, GOTO, GHexDialog)
 
-GtkWidget *g_hex_goto_new (GtkWindow *parent);
+GtkWidget *g_hex_goto_new (GHexWindow *parent);
 
 G_END_DECLS
 

@@ -84,7 +84,7 @@ advanced_find_cb (GSimpleAction *action,
 {
 	GtkWidget *dialog;
 
-	dialog = g_hex_find_advanced_new (GTK_WINDOW (window));
+	dialog = g_hex_find_advanced_new (window);
 
 	gtk_window_present (GTK_WINDOW (dialog));
 }
@@ -97,7 +97,7 @@ replace_cb (GSimpleAction *action,
 {
 	GtkWidget *dialog;
 
-	dialog = g_hex_replace_new (GTK_WINDOW (window));
+	dialog = g_hex_replace_new (window);
 
 	gtk_window_present (GTK_WINDOW (dialog));
 }
@@ -109,7 +109,7 @@ jump_cb (GSimpleAction *action,
 {
 	GtkWidget *dialog;
 
-	dialog = g_hex_goto_new (GTK_WINDOW (window));
+	dialog = g_hex_goto_new (window);
 
 	gtk_window_present (GTK_WINDOW (dialog));
 }
@@ -119,7 +119,7 @@ undo_cb (GSimpleAction *action,
          GVariant *value,
          GHexWindow *window)
 {
-	GHexWindow *win = GHEX_WINDOW(window);
+	GHexWindow *win = GHEX_WINDOW (window);
 	HexDocument *doc;
 	HexChangeData *cd;
 
