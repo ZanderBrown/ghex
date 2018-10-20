@@ -201,14 +201,14 @@ ghex_window_set_sensitivity (GHexWindow *win)
     win->undo_sens = (allmenus && (win->gh->document->undo_top != NULL));
     win->redo_sens = (allmenus && (win->gh->document->undo_stack != NULL && win->gh->document->undo_top != win->gh->document->undo_stack));
 
-    act = g_action_map_lookup_action (G_ACTION_MAP (win), "open-view");
+	act = g_action_map_lookup_action (G_ACTION_MAP (win), "open-view");
     g_simple_action_set_enabled (G_SIMPLE_ACTION (act), allmenus);
     act = g_action_map_lookup_action (G_ACTION_MAP (win), "group");
     g_simple_action_set_enabled (G_SIMPLE_ACTION (act), allmenus);
     gtk_widget_set_visible (win->statusbar_display_mode_btn, allmenus);
 
     /* File menu */
-    act = g_action_map_lookup_action (G_ACTION_MAP (win), "close");
+    act = g_action_map_lookup_action (G_ACTION_MAP (win), "save");
     g_simple_action_set_enabled (G_SIMPLE_ACTION (act), allmenus);
     act = g_action_map_lookup_action (G_ACTION_MAP (win), "save-as");
     g_simple_action_set_enabled (G_SIMPLE_ACTION (act), allmenus);
@@ -219,6 +219,8 @@ ghex_window_set_sensitivity (GHexWindow *win)
     act = g_action_map_lookup_action (G_ACTION_MAP (win), "print");
     g_simple_action_set_enabled (G_SIMPLE_ACTION (act), allmenus);
     act = g_action_map_lookup_action (G_ACTION_MAP (win), "print-preview");
+    g_simple_action_set_enabled (G_SIMPLE_ACTION (act), allmenus);
+    act = g_action_map_lookup_action (G_ACTION_MAP (win), "close");
     g_simple_action_set_enabled (G_SIMPLE_ACTION (act), allmenus);
 
     /* Edit menu */
@@ -426,6 +428,7 @@ ghex_window_constructor (GType                  type,
     GtkWidget  *image;
     GMenu      *appmenu;
     GMenu      *section;
+	GAction    *save;
 
     object = G_OBJECT_CLASS (ghex_window_parent_class)->constructor (type,
                              n_construct_properties,
@@ -539,6 +542,8 @@ ghex_window_constructor (GType                  type,
 
     btn = gtk_button_new_with_label (_("Save"));
     gtk_actionable_set_action_name (GTK_ACTIONABLE (btn), "win.save");
+	save = g_action_map_lookup_action (G_ACTION_MAP (window), "save");
+	g_object_bind_property (save, "enabled", btn, "visible", G_BINDING_SYNC_CREATE);
     gtk_header_bar_pack_end (GTK_HEADER_BAR (header), btn);
     gtk_widget_show (btn);
 
