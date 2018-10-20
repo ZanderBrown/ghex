@@ -28,9 +28,10 @@
 
 G_BEGIN_DECLS
 
-GtkWidget *create_char_table(void);
+#define G_HEX_TYPE_CHARACTERS (g_hex_characters_get_type ())
+G_DECLARE_FINAL_TYPE (GHexCharacters, g_hex_characters, G_HEX, CHARACTERS, GtkDialog)
 
-extern GtkWidget *char_table;
+GtkWidget *g_hex_characters_new (GtkWindow *parent);
 
 G_END_DECLS
 

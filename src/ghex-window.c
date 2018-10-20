@@ -363,7 +363,7 @@ static const GActionEntry gaction_entries [] = {
     { "group", NULL, "s", "'byte'", ACTION (group_data_cb) },
 
     // Show the character table
-    { "char-table", NULL, NULL, "false", ACTION (character_table_cb) },
+    { "char-table", ACTION (character_table_cb) },
     // Open base conversion dialog
     { "base-tool", NULL, NULL, "false", ACTION (converter_cb) },
     // Show the type conversion dialog in the edit window
@@ -586,19 +586,6 @@ ghex_window_sync_converter_item(GHexWindow *win, gboolean state)
     }
 }
 
-void
-ghex_window_sync_char_table_item(GHexWindow *win, gboolean state)
-{
-    const GList *wnode;
-
-    wnode = ghex_window_get_list();
-    while(wnode) {
-        if(GHEX_WINDOW(wnode->data) != win)
-            ghex_window_set_toggle_action_active (GHEX_WINDOW (wnode->data), "char-table", state);
-        wnode = wnode->next;
-    }
-}
-
 GtkWidget *
 ghex_window_new (GtkApplication *application)
 {
@@ -621,8 +608,6 @@ ghex_window_new (GtkApplication *application)
 
     ghex_window_set_toggle_action_active (win, "type-tool",
                                           converter && gtk_widget_get_visible (converter->window));
-    ghex_window_set_toggle_action_active (win, "char-table",
-                                          char_table && gtk_widget_get_visible (char_table));
 
     ghex_window_set_sensitivity(win);
 

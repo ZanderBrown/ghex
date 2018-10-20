@@ -604,34 +604,13 @@ insert_mode_cb (GSimpleAction *action,
 
 void
 character_table_cb (GSimpleAction *action,
-                    GVariant *value,
-                    GHexWindow *window)
+                    GVariant      *value,
+                    GHexWindow    *window)
 {
-    GHexWindow *win;
-    GVariant   *state;
-    gboolean    active;
-
-    win = GHEX_WINDOW (window);
-
-    state = g_action_get_state (G_ACTION (action));
-    active = !g_variant_get_boolean (state);
-    state = g_variant_new_boolean (active);
-    g_simple_action_set_state (action, state);
-
-    if (!char_table)
-        char_table = create_char_table ();
-
-    if (active) {
-        if (!gtk_widget_get_visible (char_table)) {
-            gtk_window_set_position (GTK_WINDOW (char_table), GTK_WIN_POS_MOUSE);
-            gtk_widget_show (char_table);
-        }
-        gtk_window_present (GTK_WINDOW (char_table));
-    } else {
-        if (gtk_widget_get_visible (char_table))
-            gtk_widget_hide (GTK_WIDGET (char_table));
-    }
-    ghex_window_sync_char_table_item (win, active ? 1 : 0);
+	if (G_LIKELY (!window->characters || !GTK_IS_WIDGET (window->characters))) {
+		window->characters = g_hex_characters_new (GTK_WINDOW (window));
+	}
+	gtk_window_present (GTK_WINDOW (window->characters));
 }
 
 void

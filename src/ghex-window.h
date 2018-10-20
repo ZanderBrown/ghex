@@ -61,6 +61,8 @@ struct _GHexWindow
     GtkWidget *dialog_widget;
 
     GtkWidget *advanced_find_dialog;
+
+    GtkWidget *characters;
 };
 
 struct _GHexWindowClass
@@ -89,7 +91,6 @@ void              ghex_window_flash              (GHexWindow *win,
                                                   const gchar * flash);
 GHexWindow        *ghex_window_find_for_doc       (HexDocument *doc);
 
-void ghex_window_sync_char_table_item(GHexWindow *win, gboolean state);
 void ghex_window_sync_converter_item(GHexWindow *win, gboolean state);
 
 gboolean ghex_window_ok_to_close(GHexWindow *win);
