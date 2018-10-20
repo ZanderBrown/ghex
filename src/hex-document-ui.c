@@ -74,9 +74,7 @@ find_cb (GSimpleAction *action,
 
 	dialog = g_hex_find_new (GTK_WINDOW (window));
 
-	gtk_widget_show(dialog);
-
-	raise_and_focus_widget(dialog);
+	gtk_window_present (GTK_WINDOW (dialog));
 }
 
 void
@@ -84,17 +82,11 @@ advanced_find_cb (GSimpleAction *action,
                   GVariant *value,
                   GHexWindow *window)
 {
-	GHexWindow *win = GHEX_WINDOW(window);
-	if (!win->advanced_find_dialog)
-		win->advanced_find_dialog = create_advanced_find_dialog(win);
+	GtkWidget *dialog;
 
-	if(!gtk_widget_get_visible(win->advanced_find_dialog->window)) {
-		gtk_window_set_position (GTK_WINDOW(win->advanced_find_dialog->window), GTK_WIN_POS_MOUSE);
-		gtk_window_set_default(GTK_WINDOW(win->advanced_find_dialog->window),
-							   win->advanced_find_dialog->f_close);
-		gtk_widget_show(win->advanced_find_dialog->window);
-	}
-	raise_and_focus_widget(win->advanced_find_dialog->window);
+	dialog = g_hex_find_advanced_new (GTK_WINDOW (window));
+
+	gtk_window_present (GTK_WINDOW (dialog));
 }
 
 
@@ -107,9 +99,7 @@ replace_cb (GSimpleAction *action,
 
 	dialog = g_hex_replace_new (GTK_WINDOW (window));
 
-	gtk_widget_show (dialog);
-
-	raise_and_focus_widget (dialog);
+	gtk_window_present (GTK_WINDOW (dialog));
 }
 
 void
@@ -121,9 +111,7 @@ jump_cb (GSimpleAction *action,
 
 	dialog = g_hex_goto_new (GTK_WINDOW (window));
 
-	gtk_widget_show (dialog);
-
-	raise_and_focus_widget (dialog);
+	gtk_window_present (GTK_WINDOW (dialog));
 }
 
 void

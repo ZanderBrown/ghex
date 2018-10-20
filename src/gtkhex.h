@@ -173,6 +173,9 @@ GtkHex_AutoHighlight *gtk_hex_insert_autohighlight(GtkHex *gh,
                                                    const gchar *colour);
 void gtk_hex_delete_autohighlight(GtkHex *gh, GtkHex_AutoHighlight *ahl);
 
+gboolean gtk_hex_autohighlight_get_colour (GtkHex_AutoHighlight *hlight,
+										   GdkRGBA              *colour);
+
 G_END_DECLS
 
 #endif

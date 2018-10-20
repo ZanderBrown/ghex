@@ -1528,7 +1528,7 @@ static GtkHex_Highlight *gtk_hex_insert_highlight (GtkHex *gh,
 
 	new->min_select = 0;
 
-	if (gdk_rgba_parse (&rgba, ahl->colour))
+	if (gtk_hex_autohighlight_get_colour (ahl, &rgba))
 		new->bg_color = gdk_rgba_copy (&rgba);
 	else
 		new->bg_color = NULL;
@@ -2641,3 +2641,11 @@ void add_atk_relation (GtkWidget *obj1, GtkWidget *obj2, AtkRelationType type)
         g_object_unref (G_OBJECT (relation));
 
 }
+
+gboolean
+gtk_hex_autohighlight_get_colour (GtkHex_AutoHighlight *hlight,
+								  GdkRGBA              *colour)
+{
+	return gdk_rgba_parse (colour, hlight->colour);
+}
+

@@ -32,30 +32,27 @@
 
 G_BEGIN_DECLS
 
+#define G_HEX_TYPE_FIND_CONDITION (g_hex_find_condition_get_type ())
+G_DECLARE_FINAL_TYPE (GHexFindCondition, g_hex_find_condition, G_HEX, FIND_CONDITION, GObject)
+
+GHexFindCondition *
+g_hex_find_condition_new (GString              *cond,
+						  GtkHex_AutoHighlight *hlight);
+
+#define G_HEX_TYPE_FIND_ROW (g_hex_find_row_get_type ())
+G_DECLARE_FINAL_TYPE (GHexFindRow, g_hex_find_row, G_HEX, FIND_ROW, GtkListBoxRow)
+
+GtkWidget *g_hex_find_row_new (GHexFindCondition *cond);
+
 #define G_HEX_TYPE_FIND_ADD (g_hex_find_add_get_type ())
 G_DECLARE_FINAL_TYPE (GHexFindAdd, g_hex_find_add, G_HEX, FIND_ADD, GtkDialog)
 
 GtkWidget *g_hex_find_add_new (GtkWindow *parent);
 
+#define G_HEX_TYPE_FIND_ADVANCED (g_hex_find_advanced_get_type ())
+G_DECLARE_FINAL_TYPE (GHexFindAdvanced, g_hex_find_advanced, G_HEX, FIND_ADVANCED, GtkDialog)
 
-typedef struct _AdvancedFindDialog AdvancedFindDialog;
-
-struct _AdvancedFindDialog {
-	GHexWindow *parent;
-
-	GtkWidget *window;
-	GtkWidget *hbox;
-	GtkWidget *vbox;
-	GtkListStore *list;
-	GtkWidget *tree;
-	GtkWidget *f_next, *f_prev;
-	GtkWidget *f_new, *f_remove;
-	GtkWidget *f_close;
-};
-
-/* creation of dialogs */
-AdvancedFindDialog *create_advanced_find_dialog(GHexWindow *parent);
-void               delete_advanced_find_dialog (AdvancedFindDialog *dialog);
+GtkWidget *g_hex_find_advanced_new (GtkWindow *parent);
 
 G_END_DECLS
 

@@ -60,7 +60,7 @@ struct _GHexWindow
     struct _HexDialog *dialog;
     GtkWidget *dialog_widget;
 
-    struct _AdvancedFindDialog *advanced_find_dialog;
+    GtkWidget *advanced_find_dialog;
 };
 
 struct _GHexWindowClass

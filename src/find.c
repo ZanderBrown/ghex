@@ -86,7 +86,7 @@ g_hex_find_response (GHexFind *self, gint res, gpointer data)
 			gtk_hex_set_cursor (gh, offset);
 		} else {
 			ghex_window_flash (win, _("Beginning Of File reached"));
-			display_info_dialog (win, _("String was not found!\n"));
+			display_info_dialog (GTK_WINDOW (win), _("String was not found!\n"));
 		}
 	} else {
 		if(hex_document_find_forward(gh->document,
@@ -94,7 +94,7 @@ g_hex_find_response (GHexFind *self, gint res, gpointer data)
 			gtk_hex_set_cursor(gh, offset);
 		} else {
 			ghex_window_flash(win, _("End Of File reached"));
-			display_info_dialog(win, _("String was not found!\n"));
+			display_info_dialog (GTK_WINDOW (win), _("String was not found!\n"));
 		}
 	}
 

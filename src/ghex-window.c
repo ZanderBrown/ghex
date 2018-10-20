@@ -144,7 +144,7 @@ ghex_window_close(GHexWindow *win)
 		gtk_widget_set_sensitive (converter_get, FALSE);
 
 	if (win->advanced_find_dialog)
-		delete_advanced_find_dialog(win->advanced_find_dialog);
+		gtk_widget_destroy (win->advanced_find_dialog);
 
 	gtk_widget_destroy(GTK_WIDGET(win));
 

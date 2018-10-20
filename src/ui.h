@@ -35,8 +35,7 @@ G_BEGIN_DECLS
 void create_dialog_title   (GtkWidget *, gchar *);
 gint ask_user              (GtkMessageDialog *);
 void display_error_dialog (GtkWidget *win, const gchar *msg);
-void display_info_dialog (GHexWindow *win, const gchar *msg, ...);
-void raise_and_focus_widget(GtkWidget *);
+void display_info_dialog (GtkWindow *win, const gchar *msg, ...);
 void set_doc_menu_sensitivity(HexDocument *doc);
 void update_dialog_titles (void);
 

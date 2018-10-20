@@ -557,15 +557,6 @@ close_cb (GSimpleAction *action,
 }
 
 void
-raise_and_focus_widget (GtkWidget *widget)
-{
-	if(!gtk_widget_get_realized (widget))
-		return;
-
-	gtk_window_present(GTK_WINDOW(widget));
-}
-
-void
 file_list_activated_cb (GtkAction *action,
                         gpointer   user_data)
 {
@@ -583,7 +574,7 @@ file_list_activated_cb (GtkAction *action,
 
 	if(window_list) {
 		win = GHEX_WINDOW(window_list->data);
-		raise_and_focus_widget(GTK_WIDGET(win));
+		gtk_window_present (GTK_WINDOW (win));
 	}
 }
 
@@ -635,9 +626,8 @@ character_table_cb (GSimpleAction *action,
             gtk_window_set_position (GTK_WINDOW (char_table), GTK_WIN_POS_MOUSE);
             gtk_widget_show (char_table);
         }
-        raise_and_focus_widget (char_table);
-    }
-    else {
+        gtk_window_present (GTK_WINDOW (char_table));
+    } else {
         if (gtk_widget_get_visible (char_table))
             gtk_widget_hide (GTK_WIDGET (char_table));
     }
@@ -668,7 +658,7 @@ converter_cb (GSimpleAction *action,
             gtk_window_set_position (GTK_WINDOW (converter->window), GTK_WIN_POS_MOUSE);
             gtk_widget_show (converter->window);
         }
-        raise_and_focus_widget (converter->window);
+        gtk_window_present (GTK_WINDOW (converter->window));
 
         if (!ghex_window_get_active () && converter_get)
             gtk_widget_set_sensitive (converter_get, FALSE);
@@ -754,7 +744,7 @@ prefs_cb (GSimpleAction *action,
 		gtk_window_set_position (GTK_WINDOW(prefs_ui->pbox), GTK_WIN_POS_MOUSE);
 		gtk_widget_show(GTK_WIDGET(prefs_ui->pbox));
 	}
-	raise_and_focus_widget(GTK_WIDGET(prefs_ui->pbox));
+	gtk_window_present (GTK_WINDOW (prefs_ui->pbox));
 }
 
 
@@ -885,7 +875,7 @@ display_error_dialog (GtkWidget *win, const gchar *msg)
 }
 
 void
-display_info_dialog (GHexWindow *win, const gchar *msg, ...)
+display_info_dialog (GtkWindow *win, const gchar *msg, ...)
 {
 	GtkWidget *info_dlg;
 	gchar *real_msg;

@@ -82,7 +82,7 @@ g_hex_replace_response (GHexReplace *self, gint res, gpointer data)
 									   gh->cursor_pos+1, (guchar *) str, str_len, &offset))
 			gtk_hex_set_cursor (gh, offset);
 		else {
-			display_info_dialog (win, _("String was not found!\n"));
+			display_info_dialog (GTK_WINDOW (win), _("String was not found!\n"));
 			ghex_window_flash (win, _("End Of File reached"));
 		}
 	} else if (res == GTK_RESPONSE_APPLY) {
@@ -102,7 +102,7 @@ g_hex_replace_response (GHexReplace *self, gint res, gpointer data)
 									  &offset)) {
 			gtk_hex_set_cursor (gh, offset);
 		} else {
-			display_info_dialog (win, _("End Of File reached!"));
+			display_info_dialog (GTK_WINDOW (win), _("End Of File reached!"));
 			ghex_window_flash (win, _("End Of File reached!"));
 		}
 	} else {
@@ -128,7 +128,7 @@ g_hex_replace_response (GHexReplace *self, gint res, gpointer data)
 		gtk_hex_set_cursor (gh, MIN(offset, doc->file_size));
 
 		if(count == 0) {
-			display_info_dialog (win, _("No occurrences were found."));
+			display_info_dialog (GTK_WINDOW (win), _("No occurrences were found."));
 		}
 
 		flash = g_strdup_printf (ngettext ("Replaced %d occurrence.",
