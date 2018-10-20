@@ -38,11 +38,8 @@
 #include "converter.h"
 #include "ghex-window.h"
 
-static void conv_entry_cb(GtkEntry *, gint);
-static void get_cursor_val_cb(GtkButton *button, Converter *conv);
-static void set_values(Converter *conv, gulong val);
-
-Converter *converter = NULL;
+#define BUFFER_LEN 40
+#define CONV_BUFFER_LEN 32
 
 static gboolean
 is_char_ok(signed char c, gint base)
@@ -81,7 +78,7 @@ entry_filter(GtkEditable *editable, const gchar *text, gint length,
 
 	/* if it is a paste we have to check all of things */
 	s = g_new0(gchar, length);
-	
+
 	for(i=0; i<length; i++) {
 		if(is_char_ok(text[i], base)) {
 			s[l++] = text[i];
@@ -98,7 +95,7 @@ entry_filter(GtkEditable *editable, const gchar *text, gint length,
 	g_print("Inserting -->%s<--- of length %i in pos %i\n", s, l, *pos);
 	gtk_editable_insert_text(editable, s, l, pos);
 	g_signal_handler_unblock_by_func (editable, entry_filter, data);
-#endif 
+#endif
 }
 
 static gint
@@ -115,218 +112,91 @@ entry_key_press_event_cb(GtkWidget *widget, GdkEventKey *event,
 	return FALSE;
 }
 
-#define BUFFER_LEN 40
-
-static GtkWidget *
-create_converter_entry(const gchar *name, GtkWidget *grid,
-						GtkAccelGroup *accel_group, gint pos, gint base)
-{
-	GtkWidget *label;
-    GtkWidget *entry;
-#if 0
-    gint accel_key;
-#endif /* 0/1 */
-    gchar str[BUFFER_LEN + 1];
-
-	/* label */
-	label = gtk_label_new_with_mnemonic(name);
-	gtk_label_set_xalign (GTK_LABEL (label), 0.0);
-	gtk_label_set_yalign (GTK_LABEL (label), 0.5);
-	gtk_grid_attach (GTK_GRID (grid), label, 0, pos, 1, 1);
-#if 0
-	accel_key = gtk_label_parse_uline(GTK_LABEL(label), name);
-#endif /* 0/1 */
-	gtk_widget_show(label);
-
-	/* entry */
-	entry = gtk_entry_new();
-	g_signal_connect(G_OBJECT(entry), "activate",
-					 G_CALLBACK(conv_entry_cb), GINT_TO_POINTER(base));
-	g_signal_connect(G_OBJECT(entry), "key_press_event",
-					 G_CALLBACK(entry_key_press_event_cb), NULL);
-	g_signal_connect(G_OBJECT(entry), "insert_text",
-					 G_CALLBACK(entry_filter), GINT_TO_POINTER(base));
-	gtk_label_set_mnemonic_widget(GTK_LABEL(label), entry);
-#if 0
-	gtk_widget_add_accelerator(entry, "grab_focus", accel_group, accel_key,
-							   GDK_MOD1_MASK, GTK_ACCEL_VISIBLE);
-#endif /* 0/1 */
-	gtk_widget_set_hexpand (entry, TRUE);
-	gtk_grid_attach (GTK_GRID (grid), entry, 1, pos, 1, 1);
-	gtk_widget_show(entry);
-
-	if (GTK_IS_ACCESSIBLE (gtk_widget_get_accessible (entry))) {
-		g_snprintf (str, BUFFER_LEN, "Displays the value at cursor in %s", name+1);
-		add_atk_namedesc (entry, name+1, str);
-		add_atk_relation (entry, label, ATK_RELATION_LABELLED_BY);
-	}
-       
-	return entry;
-}
-       
-static GtkWidget *
-create_converter_button(const gchar *name, GtkAccelGroup *accel_group)
-{
-	GtkWidget *button;
-    GtkWidget *label;
-#if 0
-    gint accel_key;
-#endif /* 0/1 */
-
-	button = gtk_button_new();
-    label = gtk_label_new_with_mnemonic(name);
-	gtk_label_set_xalign (GTK_LABEL (label), 0.5);
-	gtk_label_set_yalign (GTK_LABEL (label), 0.5);
-#if 0
-	accel_key = gtk_label_parse_uline(GTK_LABEL(label), name);
-#endif /* 0/1 */
-	gtk_container_add(GTK_CONTAINER(button), label);
-#if 0
-	gtk_widget_add_accelerator(button, "clicked", accel_group, accel_key,
-							   GDK_MOD1_MASK, GTK_ACCEL_VISIBLE);
-#endif /* 0/1 */
-	gtk_label_set_mnemonic_widget(GTK_LABEL(label), button);
-
-	gtk_widget_show(label);
-	gtk_widget_show(button);
-
-	return button;
-}    
-
-/* Made global. We need to access this in ui.c */
-GtkWidget *converter_get = NULL;
-
-static void
-close_converter(GtkWidget *dialog, gint response, gpointer user_data)
-{
-	ghex_window_sync_converter_item(NULL, FALSE);
-	gtk_widget_hide(GTK_WIDGET(dialog));
-}
-
-static gboolean
-converter_delete_event_cb(GtkWidget *widget, GdkEventAny *e, gpointer user_data)
-{
-	ghex_window_sync_converter_item(NULL, FALSE);
-	gtk_widget_hide(widget);
-	return TRUE;
-}
-
-static gboolean
-conv_key_press_cb (GtkWidget *widget, GdkEventKey *e, gpointer user_data)
-{
-	if (e->keyval == GDK_KEY_Escape) {
-		converter_delete_event_cb(widget, (GdkEventAny *)e, user_data);
-		return TRUE;
-	}
-	return FALSE;
-}
-
-Converter *
-create_converter()
-{
-	Converter *conv;
-	GtkWidget *grid;
-	GtkAccelGroup *accel_group;
-	gint i;
- 
-	conv = g_new0(Converter, 1);
-
-	conv->window = gtk_dialog_new_with_buttons(_("Base Converter"),
-											   NULL, 0,
-											   _("Close"),
-											   GTK_RESPONSE_OK,
-											   NULL);
-	g_signal_connect(G_OBJECT(conv->window), "response",
-					 G_CALLBACK(close_converter), conv->window);
-
-	grid = gtk_grid_new ();
-	gtk_grid_set_row_spacing (GTK_GRID (grid), 4);
-	gtk_grid_set_column_spacing (GTK_GRID (grid), 4);
-	gtk_box_pack_start (GTK_BOX (gtk_dialog_get_content_area (GTK_DIALOG (conv->window))), grid,
-					   TRUE, TRUE, 0);
-	gtk_container_set_border_width(GTK_CONTAINER(gtk_dialog_get_content_area(GTK_DIALOG(conv->window))),
-								   4);
-	gtk_box_set_spacing(GTK_BOX(gtk_dialog_get_content_area(GTK_DIALOG(conv->window))), 2);
-	gtk_widget_show (grid);
-	
-	accel_group = gtk_accel_group_new();
-
-	/* entries */
-	conv->entry[0] = create_converter_entry (_("_Binary:"), grid,
-											 accel_group, 0, 2);
-	conv->entry[1] = create_converter_entry (_("_Octal:"), grid,
-											 accel_group, 1, 8);
-	conv->entry[2] = create_converter_entry (_("_Decimal:"), grid,
-											 accel_group, 2, 10);
-	conv->entry[3] = create_converter_entry (_("_Hex:"), grid,
-											 accel_group, 3, 16);
-	conv->entry[4] = create_converter_entry (_("_ASCII:"), grid,
-											 accel_group, 4, 0);
-
-	/* get cursor button */
-	converter_get = create_converter_button(_("_Get cursor value"), accel_group);
-
-	g_signal_connect(G_OBJECT(conv->window), "delete_event",
-					 G_CALLBACK(converter_delete_event_cb), conv);
-	g_signal_connect(G_OBJECT(converter_get), "clicked",
-					 G_CALLBACK(get_cursor_val_cb), conv);
-	g_signal_connect(G_OBJECT(conv->window), "key_press_event",
-					 G_CALLBACK(conv_key_press_cb), conv);
-	gtk_grid_attach (GTK_GRID (grid), converter_get, 0, 5, 2, 1);
-
-	/* add the accelerators */
-	gtk_window_add_accel_group(GTK_WINDOW(conv->window), accel_group);
-
-	if (GTK_IS_ACCESSIBLE(gtk_widget_get_accessible(converter_get))) {
-		add_atk_namedesc (converter_get, _("Get cursor value"), _("Gets the value at cursor in binary, octal, decimal, hex and ASCII"));
-		for (i=0; i<5; i++) {
-			add_atk_relation (conv->entry[i], converter_get, ATK_RELATION_CONTROLLED_BY);
-			add_atk_relation (converter_get, conv->entry[i], ATK_RELATION_CONTROLLER_FOR);
-		}
-	}
-
-	return conv;
-}
-
-static void
-get_cursor_val_cb(GtkButton *button, Converter *conv)
-{
-	GtkWidget *view;
-	guint val, start;
-	GHexWindow *win = ghex_window_get_active();
-
-	if(win == NULL || win->gh == NULL)
-		return;
-
-	view = GTK_WIDGET(win->gh);
-
-	if(view) {
-		start = gtk_hex_get_cursor(GTK_HEX(view));
-		start = start - start % GTK_HEX(view)->group_type;
-		val = 0;
-		do {
-			val <<= 8;
-			val |= gtk_hex_get_byte(GTK_HEX(view), start);
-			start++;
-		} while((start % GTK_HEX(view)->group_type != 0) &&
-				(start < GTK_HEX(view)->document->file_size) );
-
-		set_values(conv, val);
-	}
-}
 
 static gchar *
-clean(gchar *ptr)
+clean (gchar *ptr)
 {
-	while(*ptr == '0')
+	while (*ptr == '0')
 		ptr++;
 	return ptr;
 }
 
-#define CONV_BUFFER_LEN 32
+struct _GHexConverter
+{
+	GtkDialog  parent;
+
+	GtkWidget *grid;
+
+	GtkWidget *entry[5];
+	GtkWidget *close;
+	GtkWidget *get;
+
+	gulong     value;
+};
+
+G_DEFINE_TYPE (GHexConverter, g_hex_converter, G_HEX_TYPE_DIALOG)
+
+enum {
+	PROP_0,
+	PROP_CAN_GRAB,
+	LAST_PROP
+};
+
+static GParamSpec *pspecs[LAST_PROP] = { NULL, };
+
+
+void
+g_hex_converter_set_can_grap (GHexConverter *self,
+                              gboolean       can_grab)
+{
+	gtk_widget_set_sensitive (self->get, can_grab);
+}
+
+gboolean
+g_hex_converter_get_can_grap (GHexConverter *self)
+{
+	return gtk_widget_get_sensitive (self->get);
+}
 
 static void
-set_values(Converter *conv, gulong val)
+g_hex_converter_set_property (GObject      *object,
+                              guint         property_id,
+                              const GValue *value,
+                              GParamSpec   *pspec)
+{
+	GHexConverter *data = G_HEX_CONVERTER (object);
+
+	switch (property_id) {
+		case PROP_CAN_GRAB:
+			g_hex_converter_set_can_grap (data, g_value_get_boolean (value));
+			break;
+		default:
+			G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
+			break;
+	}
+}
+
+static void
+g_hex_converter_get_property (GObject    *object,
+                              guint       property_id,
+                              GValue     *value,
+                              GParamSpec *pspec)
+{
+	GHexConverter *data = G_HEX_CONVERTER (object);
+
+	switch (property_id) {
+		case PROP_CAN_GRAB:
+			g_value_set_boolean (value, g_hex_converter_get_can_grap (data));
+			break;
+		default:
+			G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
+			break;
+	}
+}
+
+
+static void
+g_hex_converter_update_values (GHexConverter *self, gulong val)
 {
 	gchar buffer[CONV_BUFFER_LEN + 1];
 	gint i, nhex, nbytes;
@@ -341,18 +211,18 @@ set_values(Converter *conv, gulong val)
 		nhex = 1;
 	nbytes = nhex/2; 
 
-	conv->value = val;
+	self->value = val;
 	
 	for(i = 0; i < 32; i++)
 		buffer[i] =((val & (1L << (31 - i)))?'1':'0');
 	buffer[i] = 0;
-	gtk_entry_set_text(GTK_ENTRY(conv->entry[0]), clean(buffer));
+	gtk_entry_set_text(GTK_ENTRY(self->entry[0]), clean(buffer));
 
 	g_snprintf(buffer, CONV_BUFFER_LEN, "%o",(unsigned int)val);
-	gtk_entry_set_text(GTK_ENTRY(conv->entry[1]), buffer);
+	gtk_entry_set_text(GTK_ENTRY(self->entry[1]), buffer);
 	
 	g_snprintf(buffer, CONV_BUFFER_LEN, "%lu", val);
-	gtk_entry_set_text(GTK_ENTRY(conv->entry[2]), buffer);
+	gtk_entry_set_text(GTK_ENTRY(self->entry[2]), buffer);
 
 	for(i = 0, tmp = val; i < nhex; i++) {
 		buffer[nhex - i - 1] = (tmp & 0x0000000FL);
@@ -363,7 +233,7 @@ set_values(Converter *conv, gulong val)
 		tmp = tmp >> 4;
 	}
 	buffer[i] = '\0';
-	gtk_entry_set_text(GTK_ENTRY(conv->entry[3]), buffer);
+	gtk_entry_set_text(GTK_ENTRY(self->entry[3]), buffer);
 	
 	for(i = 0, tmp = val; i < nbytes; i++) {
 		buffer[nbytes - i - 1] = tmp & 0x000000FF;
@@ -372,20 +242,72 @@ set_values(Converter *conv, gulong val)
 		tmp = tmp >> 8;
 	}
 	buffer[i] = 0;
-	gtk_entry_set_text(GTK_ENTRY(conv->entry[4]), buffer);
+	gtk_entry_set_text(GTK_ENTRY(self->entry[4]), buffer);
 }
 
 static void
-conv_entry_cb(GtkEntry *entry, gint base)
+g_hex_converter_response (GtkDialog *self,
+						  gint       res)
+{
+	if (res == GTK_RESPONSE_APPLY) {
+		GtkWidget *view;
+		guint val, start;
+		GHexWindow *win = g_hex_dialog_get_window (G_HEX_DIALOG (self));
+
+		if (win == NULL || win->gh == NULL)
+			return;
+
+		view = GTK_WIDGET (win->gh);
+
+		if (view) {
+			start = gtk_hex_get_cursor (GTK_HEX (view));
+			start = start - start % GTK_HEX (view)->group_type;
+			val = 0;
+			do {
+				val <<= 8;
+				val |= gtk_hex_get_byte (GTK_HEX (view), start);
+				start++;
+			} while ((start % GTK_HEX (view)->group_type != 0) &&
+					 (start < GTK_HEX (view)->document->file_size) );
+
+			g_hex_converter_update_values (G_HEX_CONVERTER (self), val);
+		}
+	} else {
+		gtk_widget_destroy (GTK_WIDGET (self));
+	}
+}
+
+static void
+g_hex_converter_class_init (GHexConverterClass *klass)
+{
+	GObjectClass   *object_class = G_OBJECT_CLASS (klass);
+	GtkDialogClass *dialog_class = GTK_DIALOG_CLASS (klass);
+
+	object_class->set_property = g_hex_converter_set_property;
+	object_class->get_property = g_hex_converter_get_property;
+
+	pspecs[PROP_CAN_GRAB] =
+		g_param_spec_boolean ("can-grab", "If a document is available", NULL, FALSE,
+							 G_PARAM_READWRITE);
+
+	g_object_class_install_properties (object_class, LAST_PROP, pspecs);
+
+	dialog_class->response = g_hex_converter_response;
+}
+
+static void
+g_hex_converter_update_by (GHexConverter *self, GtkEntry *entry)
 {
 	gchar buffer[33];
 	const gchar *text;
 	gchar *endptr;
-	gulong val = converter->value;
+	gulong val = self->value;
 	int i, len;
+	gint base;
 	
 	text = gtk_entry_get_text(entry);
-	
+	base = GPOINTER_TO_INT (g_object_get_data (G_OBJECT (entry), "gh-base"));
+
 	switch(base) {
 	case 0:
 		strncpy(buffer, text, 4);
@@ -412,20 +334,104 @@ conv_entry_cb(GtkEntry *entry, gint base)
 		buffer[8] = 0;
 		break;
 	}
-	
+
 	if(base != 0) {
 		val = strtoul(buffer, &endptr, base);
 		if(*endptr != 0) {
-			converter->value = 0;
+			self->value = 0;
 			for(i = 0; i < 5; i++)
-				gtk_entry_set_text(GTK_ENTRY(converter->entry[i]), _("ERROR"));
+				gtk_entry_set_text(GTK_ENTRY(self->entry[i]), _("ERROR"));
 			gtk_editable_select_region(GTK_EDITABLE(entry), 0, -1);
 			return;
 		}
 	}
 
-	if(val == converter->value)
+	if(val == self->value)
 		return;
-	
-	set_values(converter, val);
+
+	g_hex_converter_update_values (self, val);
 }
+
+static void
+g_hex_converter_add_entry (GHexConverter *self,
+                           const gchar *name,
+                           gint pos,
+                           gint base)
+{
+	GtkWidget *label;
+    GtkWidget *entry;
+    gchar str[BUFFER_LEN + 1];
+
+	/* label */
+	label = gtk_label_new_with_mnemonic(name);
+	gtk_label_set_xalign (GTK_LABEL (label), 0.0);
+	gtk_label_set_yalign (GTK_LABEL (label), 0.5);
+	gtk_widget_set_halign (GTK_WIDGET (label), GTK_ALIGN_END);
+	gtk_grid_attach (GTK_GRID (self->grid), label, 0, pos, 1, 1);
+	gtk_widget_show(label);
+
+	/* entry */
+	entry = gtk_entry_new();
+	g_object_set_data (G_OBJECT (entry), "gh-base", GINT_TO_POINTER(base));
+	g_signal_connect_swapped (G_OBJECT(entry), "activate",
+					 G_CALLBACK(g_hex_converter_update_by), self);
+	g_signal_connect(G_OBJECT(entry), "key_press_event",
+					 G_CALLBACK(entry_key_press_event_cb), NULL);
+	g_signal_connect(G_OBJECT(entry), "insert_text",
+					 G_CALLBACK(entry_filter), GINT_TO_POINTER(base));
+	gtk_label_set_mnemonic_widget(GTK_LABEL(label), entry);
+	gtk_widget_set_hexpand (entry, TRUE);
+	gtk_grid_attach (GTK_GRID (self->grid), entry, 1, pos, 1, 1);
+	gtk_widget_show(entry);
+
+	if (GTK_IS_ACCESSIBLE (gtk_widget_get_accessible (entry))) {
+		g_snprintf (str, BUFFER_LEN, "Displays the value at cursor in %s", name+1);
+		add_atk_namedesc (entry, name+1, str);
+		add_atk_relation (entry, label, ATK_RELATION_LABELLED_BY);
+	}
+
+	self->entry[pos] = entry;
+}
+
+static void
+g_hex_converter_init (GHexConverter *self)
+{
+	self->grid = g_object_new (GTK_TYPE_GRID,
+							   "row-spacing", 8,
+							   "column-spacing", 8,
+							   "margin", 16,
+							   "visible", TRUE,
+							   NULL);
+	gtk_box_pack_start (GTK_BOX (gtk_dialog_get_content_area (GTK_DIALOG (self))), self->grid,
+					   TRUE, TRUE, 0);
+
+	/* entries */
+	g_hex_converter_add_entry (self, _("_Binary"), 0, 2);
+	g_hex_converter_add_entry (self, _("_Octal"), 1, 8);
+	g_hex_converter_add_entry (self, _("_Decimal"), 2, 10);
+	g_hex_converter_add_entry (self, _("_Hex"), 3, 16);
+	g_hex_converter_add_entry (self, _("_ASCII"), 4, 0);
+
+	self->get = gtk_dialog_add_button (GTK_DIALOG (self), _("Get value"), GTK_RESPONSE_APPLY);
+
+	if (GTK_IS_ACCESSIBLE(gtk_widget_get_accessible(self->get))) {
+		add_atk_namedesc (self->get, _("Get cursor value"), _("Gets the value at cursor in binary, octal, decimal, hex and ASCII"));
+		for (gint i=0; i<5; i++) {
+			add_atk_relation (self->entry[i], self->get, ATK_RELATION_CONTROLLED_BY);
+			add_atk_relation (self->get, self->entry[i], ATK_RELATION_CONTROLLER_FOR);
+		}
+	}
+}
+
+GtkWidget *
+g_hex_converter_new (GHexWindow *parent)
+{
+	return g_object_new (G_HEX_TYPE_CONVERTER,
+						 "use-header-bar", TRUE,
+						 "modal", FALSE,
+						 "transient-for", parent,
+						 "resizable", FALSE,
+						 "title", _("Base Converter"),
+						 NULL);
+}
+

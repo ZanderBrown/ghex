@@ -140,8 +140,8 @@ ghex_window_close(GHexWindow *win)
 	/* If we have created the converter window disable the
 	 * "Get cursor value" button
 	 */
-	if (converter_get)
-		gtk_widget_set_sensitive (converter_get, FALSE);
+	if (win->converter && GTK_IS_WIDGET (win->converter))
+		g_hex_converter_set_can_grap (G_HEX_CONVERTER (win->converter), FALSE);
 
 	if (win->advanced_find_dialog)
 		gtk_widget_destroy (win->advanced_find_dialog);
@@ -365,9 +365,9 @@ static const GActionEntry gaction_entries [] = {
     // Show the character table
     { "char-table", ACTION (character_table_cb) },
     // Open base conversion dialog
-    { "base-tool", NULL, NULL, "false", ACTION (converter_cb) },
+    { "base-tool", ACTION (converter_cb) },
     // Show the type conversion dialog in the edit window
-    { "type-tool", NULL, NULL, "false", ACTION (type_dialog_cb) },
+    { "type-tool", NULL, NULL, "true", ACTION (type_dialog_cb) },
 
     // Add a new view to the buffer
     { "open-view", ACTION (add_view_cb) },
@@ -605,9 +605,6 @@ ghex_window_new (GtkApplication *application)
                        drag_types,
                        sizeof (drag_types) / sizeof (drag_types[0]),
                        GDK_ACTION_COPY);
-
-    ghex_window_set_toggle_action_active (win, "type-tool",
-                                          converter && gtk_widget_get_visible (converter->window));
 
     ghex_window_set_sensitivity(win);
 

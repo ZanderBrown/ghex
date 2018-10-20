@@ -57,6 +57,8 @@ ghex_sources = [
   'configuration.h',
   'converter.c',
   'converter.h',
+  'dialog.c',
+  'dialog.h',
   'factory.c',
   'factory.h',
   'findreplace.c',

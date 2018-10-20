@@ -63,6 +63,7 @@ struct _GHexWindow
     GtkWidget *advanced_find_dialog;
 
     GtkWidget *characters;
+    GtkWidget *converter;
 };
 
 struct _GHexWindowClass

@@ -345,8 +345,8 @@ open_cb (GSimpleAction *action,
 			ghex_window_flash(GHEX_WINDOW(win), flash);
 			g_free(gtk_file_name);
 			g_free(flash);
-			if (converter_get)
-				gtk_widget_set_sensitive(converter_get, TRUE);
+			if (win->converter && GTK_IS_WIDGET (win->converter))
+				g_hex_converter_set_can_grap (G_HEX_CONVERTER (win->converter), TRUE);
 		}
 		else
 			display_error_dialog (GTK_WIDGET (ghex_window_get_active()), _("Can not open file!"));
@@ -537,8 +537,8 @@ close_cb (GSimpleAction *action,
 	/* If we have created the converter window disable the 
 	 * "Get cursor value" button
 	 */
-	if (converter_get)
-		gtk_widget_set_sensitive(converter_get, FALSE);
+	if (win->converter && GTK_IS_WIDGET (win->converter))
+		g_hex_converter_set_can_grap (G_HEX_CONVERTER (win->converter), FALSE);
 
     if(ghex_window_get_list()->next == NULL) {
         ghex_window_destroy_contents (win);
@@ -618,37 +618,12 @@ converter_cb (GSimpleAction *action,
               GVariant *value,
               GHexWindow *window)
 {
-    GHexWindow *win;
-    GVariant   *state;
-    gboolean active;
-
-    win = GHEX_WINDOW (window);
-
-    state = g_action_get_state (G_ACTION (action));
-    active = !g_variant_get_boolean (state);
-    state = g_variant_new_boolean (active);
-    g_simple_action_set_state (action, state);
-
-    if (!converter)
-        converter = create_converter ();
-
-    if (active) {
-        if (!gtk_widget_get_visible (converter->window)) {
-            gtk_window_set_position (GTK_WINDOW (converter->window), GTK_WIN_POS_MOUSE);
-            gtk_widget_show (converter->window);
-        }
-        gtk_window_present (GTK_WINDOW (converter->window));
-
-        if (!ghex_window_get_active () && converter_get)
-            gtk_widget_set_sensitive (converter_get, FALSE);
-        else
-            gtk_widget_set_sensitive (converter_get, TRUE);
-    }
-    else {
-        if (gtk_widget_get_visible (converter->window))
-            gtk_widget_hide (converter->window);
-    }
-    ghex_window_sync_converter_item (win, active ? 1 : 0);
+	if (G_LIKELY (!window->converter || !GTK_IS_WIDGET (window->converter))) {
+		window->converter = g_hex_converter_new (window);
+	}
+	// Can't grab if placeholder is open
+	g_hex_converter_set_can_grap (G_HEX_CONVERTER (window->converter), !GTK_IS_IMAGE (window->contents));
+	gtk_window_present (GTK_WINDOW (window->converter));
 }
 
 void

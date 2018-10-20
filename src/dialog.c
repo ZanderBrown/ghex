@@ -1,7 +1,7 @@
 /* -*- Mode: C; tab-width: 4; indent-tabs-mode: t; c-basic-offset: 4 -*- */
-/* gtkhex.h - definition of a GtkHex widget, modified for use with GnomeMDI
+/* dialog.c - base dialog
 
-   Copyright (C) 2004 Free Software Foundation
+   Copyright (C) 2018 Zander Brown
 
    GHex is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License as
@@ -18,30 +18,33 @@
    If not, write to the Free Software Foundation, Inc.,
    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-   Author: Jaka Mocnik <jaka@gnu.org>
+   Authors:
+   Zander Brown <zbrown@gnome.org>
 */
 
-#ifndef __GHEX_CONVERTER_H__
-#define __GHEX_CONVERTER_H__
+#ifdef HAVE_CONFIG_H
+#  include <config.h>
+#endif /* HAVE_CONFIG_H */
 
-#include <gtk/gtk.h>
+#include <glib/gi18n.h>
 
 #include "dialog.h"
 
-G_BEGIN_DECLS
+G_DEFINE_TYPE (GHexDialog, g_hex_dialog, GTK_TYPE_DIALOG)
 
-#define G_HEX_TYPE_CONVERTER (g_hex_converter_get_type ())
-G_DECLARE_FINAL_TYPE (GHexConverter, g_hex_converter, G_HEX, CONVERTER, GHexDialog)
+GHexWindow *
+g_hex_dialog_get_window (GHexDialog *self)
+{
+	return GHEX_WINDOW (gtk_window_get_transient_for (GTK_WINDOW (self)));
+}
 
-GtkWidget *
-g_hex_converter_new          (GHexWindow *parent);
-void
-g_hex_converter_set_can_grap (GHexConverter *self,
-                              gboolean       can_grab);
-gboolean
-g_hex_converter_get_can_grap (GHexConverter *self);
+static void
+g_hex_dialog_class_init (GHexDialogClass *klass)
+{
+}
 
+static void
+g_hex_dialog_init (GHexDialog *self)
+{
+}
 
-G_END_DECLS
-
-#endif /* !__GHEX_CONVERTER_H__ */
