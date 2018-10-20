@@ -24,35 +24,7 @@
 #include <config.h>
 #include <glib/gi18n.h>
 
-#include "configuration.h"
-#include "factory.h"
-#include "ghex-window.h"
-
-/* Command line options */
-static gchar **args_remaining = NULL;
-
-static GOptionEntry options[] = {
-        { G_OPTION_REMAINING, 0, 0, G_OPTION_ARG_FILENAME_ARRAY, &args_remaining, NULL, N_("FILES") },
-        { NULL }
-};
-
-const char * const open_accels[] = { "<primary>o", NULL };
-const char * const save_accels[] = { "<primary>s", NULL };
-const char * const save_as_accels[] = { "<primary><shift>s", NULL };
-const char * const print_accels[] = { "<primary>p", NULL };
-const char * const print_pre_accels[] = { "<primary><shift>p", NULL };
-const char * const undo_accels[] = { "<primary>z", NULL };
-const char * const redo_accels[] = { "<primary><shift>z", NULL };
-const char * const cut_accels[] = { "<primary>x", NULL };
-const char * const copy_accels[] = { "<primary>c", NULL };
-const char * const paste_accels[] = { "<primary>v", NULL };
-const char * const find_accels[] = { "<primary>f", NULL };
-const char * const replace_accels[] = { "<primary>h", NULL };
-const char * const jump_accels[] = { "<primary>j", NULL };
-const char * const insert_accels[] = { "Insert", NULL };
-const char * const help_accels[] = { "F1", NULL };
-const char * const quit_accels[] = { "<primary>q", NULL };
-const char * const close_accels[] = { "<primary>w", NULL };
+#include "application.h"
 
 #ifdef G_OS_WIN32
 static gchar *
@@ -86,20 +58,10 @@ ghex_locale_dir (void)
 #endif
 }
 
-static void
-ghex_activate (GApplication *application,
-               gpointer      unused)
-{
-    GList *windows = gtk_application_get_windows (GTK_APPLICATION (application));
-    gtk_window_present (GTK_WINDOW (windows->data));
-}
-
 int
 main(int argc, char **argv)
 {
-	GtkWidget *win;
-	GError *error = NULL;
-	GtkApplication *application;
+	GHexApplication *application;
 	gchar *locale_dir;
 	gint retval;
 
@@ -110,73 +72,9 @@ main(int argc, char **argv)
 	bind_textdomain_codeset (GETTEXT_PACKAGE, "UTF-8");
 	textdomain (GETTEXT_PACKAGE);
 
-	/* Initialize GTK+ program */
-	if (!gtk_init_with_args (&argc, &argv,
-	                         _("- GTK+ binary editor"),
-	                         options,
-	                         GETTEXT_PACKAGE,
-	                         &error)) {
-		g_printerr (_("%s\nRun '%s --help' to see a full list of available command line options.\n"),
-		            error->message, argv[0]);
-		g_error_free (error);
-		return 1;
-	}
+	g_set_application_name (_("GHex"));
 
-	/* Set default window icon */
-	gtk_window_set_default_icon_name ("ghex");
-
-	/* load preferences */
-	ghex_init_configuration();
-
-	/* accessibility setup */
-	setup_factory();
-
-	application = gtk_application_new ("org.gnome.GHexApplication",
-	                                   G_APPLICATION_NON_UNIQUE);
-
-	gtk_application_set_accels_for_action (application, "win.open", open_accels);
-	gtk_application_set_accels_for_action (application, "win.save", save_accels);
-	gtk_application_set_accels_for_action (application, "win.save-as", save_as_accels);
-	gtk_application_set_accels_for_action (application, "win.print", print_accels);
-	gtk_application_set_accels_for_action (application, "win.print-preview", print_pre_accels);
-
-	gtk_application_set_accels_for_action (application, "win.undo", undo_accels);
-	gtk_application_set_accels_for_action (application, "win.redo", redo_accels);
-	gtk_application_set_accels_for_action (application, "win.cut", cut_accels);
-	gtk_application_set_accels_for_action (application, "win.copy", copy_accels);
-	gtk_application_set_accels_for_action (application, "win.paste", paste_accels);
-	gtk_application_set_accels_for_action (application, "win.insert", insert_accels);
-
-	gtk_application_set_accels_for_action (application, "win.find", find_accels);
-	gtk_application_set_accels_for_action (application, "win.replace", replace_accels);
-	gtk_application_set_accels_for_action (application, "win.goto", jump_accels);
-
-	gtk_application_set_accels_for_action (application, "win.help", help_accels);
-	gtk_application_set_accels_for_action (application, "win.quit", quit_accels);
-	gtk_application_set_accels_for_action (application, "win.close", close_accels);
-
-	g_signal_connect (application, "activate",
-	                  G_CALLBACK (ghex_activate), NULL);
-
-	g_application_register (G_APPLICATION (application), NULL, NULL);
-
-	if (args_remaining != NULL) {
-		gchar **filename;
-		for (filename = args_remaining; *filename != NULL; filename++) {
-			if (g_file_test (*filename, G_FILE_TEST_EXISTS)) {
-				win = ghex_window_new_from_file (application, *filename);
-				if(win != NULL) {
-					gtk_widget_show(win);
-				}
-			}
-		}
-	}
-
-	if(ghex_window_get_list() == NULL) {
-		win = ghex_window_new (application);
-		gtk_widget_show(win);
-	}
-	else win = GTK_WIDGET(ghex_window_get_list()->data);
+	application = g_hex_application_new ();
 
 	retval = g_application_run (G_APPLICATION (application), argc, argv);
 	g_object_unref (application);

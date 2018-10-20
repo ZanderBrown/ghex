@@ -51,6 +51,8 @@ libghex_dep = declare_dependency(
 )
 
 ghex_sources = [
+  'application.c',
+  'application.h',
   'chartable.c',
   'chartable.h',
   'config.c',

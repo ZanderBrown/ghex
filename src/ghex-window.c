@@ -97,7 +97,7 @@ ghex_window_drag_data_received(GtkWidget *widget,
         }
 
         if (newwin == NULL)
-            newwin = ghex_window_new (GTK_APPLICATION (g_application_get_default ()));
+            newwin = ghex_window_new (G_HEX_APPLICATION (g_application_get_default ()));
         if (ghex_window_load (GHEX_WINDOW (newwin), filename)) {
             if (newwin != GTK_WIDGET (win))
                 gtk_widget_show (newwin);
@@ -585,7 +585,7 @@ ghex_window_sync_converter_item(GHexWindow *win, gboolean state)
 }
 
 GtkWidget *
-ghex_window_new (GtkApplication *application)
+ghex_window_new (GHexApplication *application)
 {
     GHexWindow *win;
 
@@ -628,7 +628,7 @@ create_document_view(HexDocument *doc)
 }
 
 GtkWidget *
-ghex_window_new_from_doc (GtkApplication *application,
+ghex_window_new_from_doc (GHexApplication *application,
                           HexDocument    *doc)
 {
     GtkWidget *win = ghex_window_new (application);
@@ -647,7 +647,7 @@ ghex_window_new_from_doc (GtkApplication *application,
 }
 
 GtkWidget *
-ghex_window_new_from_file (GtkApplication *application,
+ghex_window_new_from_file (GHexApplication *application,
                            const gchar    *filename)
 {
     GtkWidget *win = ghex_window_new (application);

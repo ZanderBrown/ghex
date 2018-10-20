@@ -282,7 +282,7 @@ open_cb (GSimpleAction *action,
 		gchar *flash;
 
 		if(GHEX_WINDOW(win)->gh != NULL) {
-			win = GHEX_WINDOW (ghex_window_new_from_file (GTK_APPLICATION (g_application_get_default ()),
+			win = GHEX_WINDOW (ghex_window_new_from_file (G_HEX_APPLICATION (g_application_get_default ()),
 			                                              gtk_file_chooser_get_filename (GTK_FILE_CHOOSER (file_sel))));
 			if(win != NULL)
 				gtk_widget_show(GTK_WIDGET(win));
@@ -801,7 +801,7 @@ add_view_cb (GSimpleAction *action,
 	if(win->gh == NULL)
 		return;
 
-	newwin = ghex_window_new_from_doc (GTK_APPLICATION (g_application_get_default ()),
+	newwin = ghex_window_new_from_doc (G_HEX_APPLICATION (g_application_get_default ()),
 	                                   win->gh->document);
 	gtk_widget_show(newwin);
 }
