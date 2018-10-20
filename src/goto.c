@@ -139,7 +139,6 @@ g_hex_goto_init (GHexGoto *self)
 	GtkWidget *wrap;
 	GtkWidget *label;
 
-	g_signal_connect (G_OBJECT (self), "delete-event", G_CALLBACK (delete_event_cb), NULL);
 	g_signal_connect (G_OBJECT (self), "response", G_CALLBACK (g_hex_goto_response), NULL);
 	g_signal_connect (G_OBJECT (self), "show", G_CALLBACK (g_hex_goto_show), NULL);
 

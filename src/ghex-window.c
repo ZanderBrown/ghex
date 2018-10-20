@@ -159,8 +159,6 @@ ghex_window_focus_in_event(GtkWidget *win, GdkEventFocus *event)
 {
     active_window = GHEX_WINDOW(win);
 
-    update_dialog_titles();
-
     if (GTK_WIDGET_CLASS (ghex_window_parent_class)->focus_in_event)
         return GTK_WIDGET_CLASS (ghex_window_parent_class)->focus_in_event (win, event);
     else

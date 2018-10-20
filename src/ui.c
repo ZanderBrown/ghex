@@ -57,53 +57,10 @@ gchar *search_type_label[] = {
 	N_("ASCII data"),
 };
 
-void
-cancel_cb(GtkWidget *w, GtkWidget *me)
-{
-	gtk_widget_hide(me);
-}
-
-gint
-delete_event_cb(GtkWidget *w, GdkEventAny *e, GtkWindow *win)
-{
-	gtk_widget_hide(w);
-	
-	return TRUE;
-}
-
 gint
 ask_user(GtkMessageDialog *message_box)
 {
 	return gtk_dialog_run(GTK_DIALOG(message_box));
-}
-
-void
-create_dialog_title(GtkWidget *window, gchar *title)
-{
-	gchar *full_title;
-	GHexWindow *win;
-
-	if(!window)
-		return;
-
-	win = ghex_window_get_active();
-
-#if defined(__GNUC__) && (__GNUC__ > 4)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wformat-nonliteral"
-#endif
-	if(win != NULL && win->gh != NULL)
-		full_title = g_strdup_printf(title, win->gh->document->path_end);
-	else
-		full_title = g_strdup_printf(title, "");
-#if defined(__GNUC__) && (__GNUC__ > 4)
-#pragma GCC diagnostic pop
-#endif
-
-	if(full_title) {
-		gtk_window_set_title(GTK_WINDOW(window), full_title);
-		g_free(full_title);
-	}
 }
 
 /*
@@ -557,28 +514,6 @@ close_cb (GSimpleAction *action,
 }
 
 void
-file_list_activated_cb (GtkAction *action,
-                        gpointer   user_data)
-{
-	GHexWindow *win;
-	HexDocument *doc = HEX_DOCUMENT(user_data);
-	const GList *window_list;
-
-	window_list = ghex_window_get_list();
-	while(window_list) {
-		win = GHEX_WINDOW(window_list->data);
-		if(win->gh && win->gh->document == doc)
-			break;
-		window_list = window_list->next;
-	}
-
-	if(window_list) {
-		win = GHEX_WINDOW(window_list->data);
-		gtk_window_present (GTK_WINDOW (win));
-	}
-}
-
-void
 insert_mode_cb (GSimpleAction *action,
                 GVariant *value,
                 GHexWindow *window)
@@ -853,12 +788,6 @@ display_info_dialog (GtkWindow *win, const gchar *msg, ...)
 	gtk_window_set_resizable (GTK_WINDOW (info_dlg), FALSE);
 	gtk_dialog_run (GTK_DIALOG (info_dlg));
 	gtk_widget_destroy (info_dlg);
-}
-
-void
-update_dialog_titles()
-{
-	// TODO: Remove
 }
 
 void

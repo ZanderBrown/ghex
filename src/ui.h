@@ -32,16 +32,10 @@
 G_BEGIN_DECLS
 
 /* various ui convenience functions */
-void create_dialog_title   (GtkWidget *, gchar *);
 gint ask_user              (GtkMessageDialog *);
 void display_error_dialog (GtkWidget *win, const gchar *msg);
 void display_info_dialog (GtkWindow *win, const gchar *msg, ...);
 void set_doc_menu_sensitivity(HexDocument *doc);
-void update_dialog_titles (void);
-
-/* hiding widgets on cancel or delete_event */
-gint delete_event_cb(GtkWidget *, GdkEventAny *, GtkWindow *);
-void cancel_cb      (GtkWidget *, GtkWidget *);
 
 /* File menu */
 void open_cb (GSimpleAction *action, GVariant *value, GHexWindow *window);
@@ -79,8 +73,6 @@ void type_dialog_cb (GSimpleAction *action, GVariant *value, GHexWindow *window)
 /* Help menu */
 void help_cb (GSimpleAction *action, GVariant *value, GHexWindow *window);
 void about_cb (GSimpleAction *action, GVariant *value, GHexWindow *window);
-
-void file_list_activated_cb (GtkAction *action, gpointer user_data);
 
 /* tmp utils */
 GtkWidget *create_hex_view(HexDocument *doc);
