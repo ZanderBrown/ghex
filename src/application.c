@@ -342,7 +342,7 @@ g_hex_application_startup (GApplication *app)
 	self = G_HEX_APPLICATION (app);
 
 	/* Set default window icon */
-	gtk_window_set_default_icon_name ("ghex");
+	gtk_window_set_default_icon_name ("org.gnome.GHex");
 
 	self->settings = g_settings_new ("org.gnome.GHex");
 

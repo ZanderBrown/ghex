@@ -403,7 +403,7 @@ ghex_window_destroy_contents (GHexWindow *win)
 	win->contents = NULL;
 
 	placeholder = g_object_new (GTK_TYPE_IMAGE,
-						  "icon-name", "ghex-symbolic",
+						  "icon-name", "org.gnome.GHex-symbolic",
 						  "pixel-size", 128,
 						  "margin", 16,
 						  "halign", GTK_ALIGN_CENTER,
