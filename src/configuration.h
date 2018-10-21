@@ -40,6 +40,8 @@ G_BEGIN_DECLS
 #define GHEX_PREF_HEADER_FONT        "print-font-header"
 #define GHEX_PREF_BOX_SIZE           "print-shaded-rows"
 #define GHEX_PREF_OFFSETS_COLUMN     "show-offsets"
+#define G_HEX_MAX_MAX_UNDO_DEPTH 100000
+
 
 G_END_DECLS
 

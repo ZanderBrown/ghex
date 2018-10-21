@@ -34,8 +34,6 @@
 #include "ui.h"
 #include "application.h"
 
-#define MAX_MAX_UNDO_DEPTH 100000
-
 static void offset_cb(GtkWidget *w, GHexPreferences *pui);
 static void format_activated_cb(GtkEntry *entry, GHexPreferences *pui);
 static gboolean format_focus_out_event_cb(GtkEntry *entry, GdkEventFocus *event,
@@ -155,11 +153,11 @@ static void
 g_hex_preferences_init (GHexPreferences *self)
 {
 	GtkWidget *vbox, *label, *frame;
-	GtkAdjustment *undo_adj, *box_adj;
 	GHexApplication      *app;
 
-	GtkWidget *list;
-	GtkWidget *control;
+	GtkWidget     *list;
+	GtkWidget     *control;
+	GtkAdjustment *adj;
 
 	gboolean gail_up;
 
@@ -190,13 +188,13 @@ g_hex_preferences_init (GHexPreferences *self)
 	gtk_list_box_set_header_func (GTK_LIST_BOX (list), g_hex_preferences_header_func, NULL, NULL);
 
 	/* max undo levels */
-	undo_adj = GTK_ADJUSTMENT (gtk_adjustment_new (0, 0, MAX_MAX_UNDO_DEPTH, 1, 10, 0));
-	g_object_bind_property (G_OBJECT (app), "undo-depth", G_OBJECT (undo_adj),
+	adj = GTK_ADJUSTMENT (gtk_adjustment_new (0, 0, G_HEX_MAX_MAX_UNDO_DEPTH, 1, 10, 0));
+	g_object_bind_property (G_OBJECT (app), "undo-depth", G_OBJECT (adj),
 						"value", G_BINDING_SYNC_CREATE | G_BINDING_BIDIRECTIONAL);
-	control = gtk_spin_button_new (undo_adj, 1, 0);
+	control = gtk_spin_button_new (adj, 1, 0);
 	gtk_widget_show (control);
 
-	gail_up = GTK_IS_ACCESSIBLE(gtk_widget_get_accessible(control)) ;
+	gail_up = GTK_IS_ACCESSIBLE (GTK_WIDGET (self));
 
 	if (gail_up) {
 		add_atk_namedesc (control, _("Undo levels"), _("Select maximum number of undo levels"));
@@ -209,7 +207,7 @@ g_hex_preferences_init (GHexPreferences *self)
 	gtk_widget_show (control);
 
 	self->format = gtk_entry_new();
-	gtk_widget_set_sensitive(self->format, FALSE);
+	gtk_widget_set_sensitive (self->format, FALSE);
 	gtk_entry_set_text (GTK_ENTRY (self->format), offset_format);
 	g_signal_connect (G_OBJECT (self->format), "activate",
 					  G_CALLBACK (format_activated_cb), self);
@@ -236,7 +234,7 @@ g_hex_preferences_init (GHexPreferences *self)
 	}
 	g_signal_connect (G_OBJECT(self->offset_menu), "changed",
 					  G_CALLBACK(offset_cb), self);
-	gtk_box_pack_end (GTK_BOX(control), GTK_WIDGET (self->offset_menu),
+	gtk_box_pack_end (GTK_BOX (control), GTK_WIDGET (self->offset_menu),
 					  FALSE, TRUE, 0);
 	if (gail_up) {
 		add_atk_namedesc (self->format, "format_entry", _("Enter the cursor offset format"));
@@ -314,10 +312,10 @@ g_hex_preferences_init (GHexPreferences *self)
 	g_hex_preferences_add_row (list, _("Header fo_nt"), control);
 
 	/* shaded box entry */
-	box_adj = GTK_ADJUSTMENT (gtk_adjustment_new (0, 0, 1000, 1, 10, 0));
-	g_object_bind_property (G_OBJECT (app), "shaded-box", G_OBJECT (box_adj),
+	adj = GTK_ADJUSTMENT (gtk_adjustment_new (0, 0, 1000, 1, 10, 0));
+	g_object_bind_property (G_OBJECT (app), "shaded-box", G_OBJECT (adj),
 						"value", G_BINDING_SYNC_CREATE | G_BINDING_BIDIRECTIONAL);
-	control = gtk_spin_button_new (box_adj, 1, 0);
+	control = gtk_spin_button_new (adj, 1, 0);
 	gtk_widget_show (control);
 	if (gail_up) {
 		add_atk_namedesc (control, _("Box size"), _("Select size of box (in number of lines)"));

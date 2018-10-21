@@ -443,8 +443,8 @@ g_hex_application_class_init (GHexApplicationClass *klass)
 							G_PARAM_READWRITE);
 
 	pspecs[PROP_UNDO_DEPTH] =
-		g_param_spec_uint ("undo-depth", "Undo depth", NULL, 0, G_MAXUINT, 100,
-							G_PARAM_READWRITE);
+		g_param_spec_uint ("undo-depth", "Undo depth", NULL, 0,
+						   G_HEX_MAX_MAX_UNDO_DEPTH, 100, G_PARAM_READWRITE);
 
 	pspecs[PROP_OFFSET_FORMAT] =
 		g_param_spec_string ("offset-format", "Statusbar format", NULL, NULL,
