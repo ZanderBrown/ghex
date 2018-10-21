@@ -652,21 +652,14 @@ prefs_cb (GSimpleAction *action,
           GVariant *value,
           GHexWindow *window)
 {
-	if(!prefs_ui)
-		prefs_ui = create_prefs_dialog();
+	GtkWidget *dialog;
 
-	set_current_prefs(prefs_ui);
+	dialog = g_hex_prefrences_new (window);
 
-	if(window != NULL)
-		gtk_window_set_transient_for(GTK_WINDOW(prefs_ui->pbox),
-									 GTK_WINDOW(window));
-	if(!gtk_widget_get_visible(prefs_ui->pbox)) {
-		gtk_window_set_position (GTK_WINDOW(prefs_ui->pbox), GTK_WIN_POS_MOUSE);
-		gtk_widget_show(GTK_WIDGET(prefs_ui->pbox));
-	}
-	gtk_window_present (GTK_WINDOW (prefs_ui->pbox));
+	set_current_prefs(G_HEX_PREFERENCES (dialog));
+
+	gtk_window_present (GTK_WINDOW (dialog));
 }
-
 
 void
 revert_cb (GSimpleAction *action,

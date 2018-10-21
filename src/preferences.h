@@ -21,29 +21,23 @@
    Author: Jaka Mocnik <jaka@gnu.org>
 */
 
+#include "dialog.h"
+
 #ifndef __GHEX_PREFERENCES_H__
 #define __GHEX_PREFERENCES_H__
 
 G_BEGIN_DECLS
 
-typedef struct _PropertyUI PropertyUI;
-struct _PropertyUI {
-	GtkWidget *pbox;
-	GtkRadioButton *group_type[3];
-	GtkWidget *font_button, *undo_spin, *box_size_spin;
-	GtkWidget *offset_menu, *offset_choice[3];
-	GtkWidget *format, *offsets_col;
-	GtkWidget *paper_sel, *print_font_sel;
-	GtkWidget *df_button, *hf_button;
-	GtkWidget *df_label, *hf_label;
-};
 
-extern PropertyUI *prefs_ui;
+#define G_HEX_TYPE_PREFERENCES (g_hex_prefrences_get_type ())
+G_DECLARE_FINAL_TYPE (GHexPreferences, g_hex_prefrences, G_HEX, PREFERENCES, GHexDialog)
+
+GtkWidget *g_hex_prefrences_new (GHexWindow *parent);
+
 extern guint group_type[3];
 extern gchar *group_type_label[3];
 
-PropertyUI *create_prefs_dialog(void);
-void       set_current_prefs(PropertyUI *pui);
+void       set_current_prefs(GHexPreferences *pui);
 
 G_END_DECLS
 

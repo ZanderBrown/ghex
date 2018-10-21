@@ -55,7 +55,6 @@ ghex_sources = [
   'application.h',
   'chartable.c',
   'chartable.h',
-  'config.c',
   'configuration.h',
   'converter.c',
   'converter.h',
