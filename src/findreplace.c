@@ -268,7 +268,7 @@ enum {
 
 static guint row_signals[ROW_LAST_SIGNAL] = { 0 };
 
-gboolean
+static gboolean
 render_string (GBinding     *binding,
                const GValue *from,
                GValue       *to,

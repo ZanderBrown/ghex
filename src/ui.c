@@ -592,30 +592,22 @@ type_dialog_cb (GSimpleAction *action,
 gint
 map_group_nick (const gchar* nick)
 {
-	g_message ("Nick %s", nick);
 	if (g_strcmp0(nick, "words") == 0) {
-		g_message ("Word");
 		return GROUP_WORD;
 	} else if (g_strcmp0(nick, "longwords") == 0) {
-		g_message ("Long");
 		return GROUP_LONG;
 	}
-	g_message ("Byte");
 	return GROUP_BYTE;
 }
 
 const gchar*
 map_nick_group (gint group)
 {
-	g_message ("Group %i", group);
 	if (group == GROUP_WORD) {
-		g_message ("Word");
 		return "words";
 	} else if (group == GROUP_LONG) {
-		g_message ("Long");
 		return "longwords";
 	}
-	g_message ("Byte");
 	return "bytes";
 }
 
@@ -654,7 +646,7 @@ prefs_cb (GSimpleAction *action,
 {
 	GtkWidget *dialog;
 
-	dialog = g_hex_prefrences_new (window);
+	dialog = g_hex_preferences_new (window);
 
 	gtk_window_present (GTK_WINDOW (dialog));
 }

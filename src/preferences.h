@@ -28,11 +28,10 @@
 
 G_BEGIN_DECLS
 
+#define G_HEX_TYPE_PREFERENCES (g_hex_preferences_get_type ())
+G_DECLARE_FINAL_TYPE (GHexPreferences, g_hex_preferences, G_HEX, PREFERENCES, GHexDialog)
 
-#define G_HEX_TYPE_PREFERENCES (g_hex_prefrences_get_type ())
-G_DECLARE_FINAL_TYPE (GHexPreferences, g_hex_prefrences, G_HEX, PREFERENCES, GHexDialog)
-
-GtkWidget *g_hex_prefrences_new (GHexWindow *parent);
+GtkWidget *g_hex_preferences_new (GHexWindow *parent);
 
 extern guint group_type[3];
 extern gchar *group_type_label[3];

@@ -37,7 +37,6 @@
 #define MAX_MAX_UNDO_DEPTH 100000
 
 static void offset_cb(GtkWidget *w, GHexPreferences *pui);
-static void group_type_cb(GtkRadioButton *rd, GHexPreferences *pui);
 static void format_activated_cb(GtkEntry *entry, GHexPreferences *pui);
 static gboolean format_focus_out_event_cb(GtkEntry *entry, GdkEventFocus *event,
 										  GHexPreferences *pui);
@@ -46,17 +45,14 @@ struct _GHexPreferences
 {
 	GHexDialog      parent;
 
-	GtkRadioButton *group_type[3];
-	GtkWidget      *font_button, *undo_spin, *box_size_spin;
-	GtkWidget      *offset_menu, *offset_choice[3];
-	GtkWidget      *format, *offsets_col;
-	GtkWidget      *paper_sel, *print_font_sel;
+	GtkWidget      *offset_menu;
+	GtkWidget      *format;
 };
 
-G_DEFINE_TYPE (GHexPreferences, g_hex_prefrences, G_HEX_TYPE_DIALOG)
+G_DEFINE_TYPE (GHexPreferences, g_hex_preferences, G_HEX_TYPE_DIALOG)
 
 static void
-g_hex_prefrences_response (GtkDialog *self, gint response)
+g_hex_preferences_response (GtkDialog *self, gint response)
 {
 	GError *error = NULL;
 
@@ -85,94 +81,144 @@ g_hex_prefrences_response (GtkDialog *self, gint response)
 }
 
 static void
-g_hex_prefrences_class_init (GHexPreferencesClass *klass)
+g_hex_preferences_class_init (GHexPreferencesClass *klass)
 {
 	GtkDialogClass *dialog_class = GTK_DIALOG_CLASS (klass);
 
-	dialog_class->response = g_hex_prefrences_response;
+	dialog_class->response = g_hex_preferences_response;
+}
+
+static GtkWidget *
+g_hex_preferences_add_row (GtkWidget   *list,
+                            const gchar *title,
+                            GtkWidget   *child)
+{
+	GtkWidget *row;
+	GtkWidget *wrap;
+	GtkWidget *label;
+
+	row = g_object_new (GTK_TYPE_LIST_BOX_ROW,
+						"activatable", FALSE,
+						"visible", TRUE,
+						NULL);
+
+	wrap = g_object_new (GTK_TYPE_BOX,
+						"orientation", GTK_ORIENTATION_HORIZONTAL,
+						"spacing", 8,
+						"margin", 8,
+						"visible", TRUE,
+						NULL);
+
+	label = g_object_new (GTK_TYPE_LABEL,
+						  "label", title,
+						  "use-underline", TRUE,
+						  "mnemonic-widget", child,
+						  "halign", GTK_ALIGN_START,
+						  "valign", GTK_ALIGN_CENTER,
+						  "ellipsize", PANGO_ELLIPSIZE_MIDDLE,
+						  "visible", TRUE,
+						  NULL);
+	gtk_box_pack_start (GTK_BOX (wrap), label, TRUE, TRUE, 0);
+
+	gtk_box_pack_end (GTK_BOX (wrap), child, FALSE, FALSE, 0);
+
+	add_atk_relation (child, label, ATK_RELATION_LABELLED_BY);
+
+	gtk_container_add (GTK_CONTAINER (row), wrap);
+
+	gtk_container_add (GTK_CONTAINER (list), row);
+
+	return row;
+}
+
+void
+g_hex_preferences_header_func (GtkListBoxRow *row,
+                              GtkListBoxRow *before,
+                              gpointer user_data)
+{
+	GtkWidget *current;
+
+	if (G_UNLIKELY (!before)) {
+		gtk_list_box_row_set_header (row, NULL);
+		return;
+	}
+
+	current = gtk_list_box_row_get_header (row);
+	if (!current) {
+		current = gtk_separator_new (GTK_ORIENTATION_HORIZONTAL);
+		gtk_widget_show (current);
+		gtk_list_box_row_set_header (row, current);
+	}
 }
 
 static void
-g_hex_prefrences_init (GHexPreferences *self)
+g_hex_preferences_init (GHexPreferences *self)
 {
-	GtkWidget *vbox, *label, *frame, *box, *fbox, *flabel, *grid;
+	GtkWidget *vbox, *label, *frame;
 	GtkAdjustment *undo_adj, *box_adj;
-	GtkWidget *notebook;
 	GHexApplication      *app;
-	guint                 undo_depth;
 
-	GtkWidget *df_button, *df_label;
-	GtkWidget *hf_button, *hf_label;
-
-	GSList *group;
-
-	int i;
+	GtkWidget *list;
+	GtkWidget *control;
 
 	gboolean gail_up;
 
+	const gchar *offset_format;
+
 	app = G_HEX_APPLICATION (g_application_get_default ());
-	undo_depth = g_hex_application_get_undo_depth (app);
+	offset_format = g_hex_application_get_offset_format (app);
 
+	gtk_dialog_add_button (GTK_DIALOG (self), _("_Done"), GTK_RESPONSE_CLOSE);
+	gtk_dialog_add_button (GTK_DIALOG (self), _("_Help"), GTK_RESPONSE_HELP);
+	gtk_dialog_set_default_response (GTK_DIALOG (self), GTK_RESPONSE_CLOSE);
 
-	gtk_dialog_add_button (GTK_DIALOG (self), _("Close"), GTK_RESPONSE_CLOSE);
-	gtk_dialog_add_button (GTK_DIALOG (self), _("Help"), GTK_RESPONSE_HELP);
+	vbox = g_object_new (GTK_TYPE_BOX,
+						 "orientation", GTK_ORIENTATION_VERTICAL,
+						 "spacing", 8,
+						 "margin", 16,
+						 "visible", TRUE,
+						 NULL);
+	gtk_container_add (GTK_CONTAINER (gtk_dialog_get_content_area (GTK_DIALOG (self))), vbox);
 
-	notebook = gtk_notebook_new ();
-	gtk_widget_show (notebook);
-	gtk_container_add(GTK_CONTAINER(gtk_dialog_get_content_area(GTK_DIALOG(self))), notebook);
+	frame = gtk_frame_new (NULL);
 
-	/* editing page */
-	vbox = gtk_box_new (GTK_ORIENTATION_VERTICAL, 0);
-	gtk_widget_show (vbox);
+	list = g_object_new (GTK_TYPE_LIST_BOX,
+						 "selection-mode", GTK_SELECTION_NONE,
+						 "visible", TRUE,
+						 "width-request", 450,
+						 NULL);
+	gtk_list_box_set_header_func (GTK_LIST_BOX (list), g_hex_preferences_header_func, NULL, NULL);
 
 	/* max undo levels */
-	undo_adj = GTK_ADJUSTMENT (gtk_adjustment_new (MIN (undo_depth, MAX_MAX_UNDO_DEPTH),
-												   0, MAX_MAX_UNDO_DEPTH, 1, 10, 0));
+	undo_adj = GTK_ADJUSTMENT (gtk_adjustment_new (0, 0, MAX_MAX_UNDO_DEPTH, 1, 10, 0));
+	g_object_bind_property (G_OBJECT (app), "undo-depth", G_OBJECT (undo_adj),
+						"value", G_BINDING_SYNC_CREATE | G_BINDING_BIDIRECTIONAL);
+	control = gtk_spin_button_new (undo_adj, 1, 0);
+	gtk_widget_show (control);
 
-	box = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, 0);
-	gtk_widget_show (box);
-
-	label = gtk_label_new_with_mnemonic (_("_Maximum number of undo levels:"));
-	gtk_label_set_xalign (GTK_LABEL (label), 0.0);
-	gtk_label_set_yalign (GTK_LABEL (label), 0.5);
-	gtk_box_pack_start (GTK_BOX (box), label, TRUE, TRUE, 8);
-	gtk_widget_show (label);
-						  
-	self->undo_spin = gtk_spin_button_new (undo_adj, 1, 0);
-	gtk_box_pack_end (GTK_BOX (box), GTK_WIDGET (self->undo_spin), FALSE, TRUE, 8);
-	gtk_widget_show (self->undo_spin);
-
-	gtk_box_pack_start (GTK_BOX (vbox), box, FALSE, TRUE, 8);
-
-	/* cursor offset format */
-	box = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, 0);
-	gtk_widget_show (box);
-
-	gtk_label_set_mnemonic_widget (GTK_LABEL (label), self->undo_spin);
-
-	gail_up = GTK_IS_ACCESSIBLE(gtk_widget_get_accessible(label)) ;
+	gail_up = GTK_IS_ACCESSIBLE(gtk_widget_get_accessible(control)) ;
 
 	if (gail_up) {
-		add_atk_namedesc (self->undo_spin, _("Undo levels"), _("Select maximum number of undo levels"));
-		add_atk_relation (self->undo_spin, label, ATK_RELATION_LABELLED_BY);
+		add_atk_namedesc (control, _("Undo levels"), _("Select maximum number of undo levels"));
 	}
+	g_hex_preferences_add_row (list, _("_Max undo levels"), control);
 
-	label = gtk_label_new_with_mnemonic (_("_Show cursor offset in statusbar as:"));
-	gtk_label_set_xalign (GTK_LABEL (label), 0.0);
-	gtk_label_set_yalign (GTK_LABEL (label), 0.5);
-	gtk_box_pack_start (GTK_BOX (box), label, TRUE, TRUE, 8);
-	gtk_widget_show (label);
+	/* cursor offset format */
+	control = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, 0);
+	gtk_style_context_add_class (gtk_widget_get_style_context (control), GTK_STYLE_CLASS_LINKED);
+	gtk_widget_show (control);
 
 	self->format = gtk_entry_new();
+	gtk_widget_set_sensitive(self->format, FALSE);
+	gtk_entry_set_text (GTK_ENTRY (self->format), offset_format);
 	g_signal_connect (G_OBJECT (self->format), "activate",
 					  G_CALLBACK (format_activated_cb), self);
 	g_signal_connect (G_OBJECT (self->format), "focus_out_event",
 					  G_CALLBACK (format_focus_out_event_cb), self);
-	gtk_box_pack_start (GTK_BOX (box), self->format, TRUE, TRUE, 8);
+	gtk_box_pack_start (GTK_BOX (control), self->format, TRUE, TRUE, 0);
 	gtk_widget_show (self->format);
 
 	self->offset_menu = gtk_combo_box_text_new ();
-	gtk_label_set_mnemonic_widget (GTK_LABEL(label), self->offset_menu);
 	gtk_widget_show (self->offset_menu);
 	gtk_combo_box_text_append_text (GTK_COMBO_BOX_TEXT (self->offset_menu),
 								    _("Decimal"));
@@ -180,220 +226,6 @@ g_hex_prefrences_init (GHexPreferences *self)
 								    _("Hexadecimal"));
 	gtk_combo_box_text_append_text (GTK_COMBO_BOX_TEXT (self->offset_menu),
 								    _("Custom"));
-	g_signal_connect (G_OBJECT(self->offset_menu), "changed",
-					  G_CALLBACK(offset_cb), self);
-	gtk_box_pack_end (GTK_BOX(box), GTK_WIDGET (self->offset_menu),
-					  FALSE, TRUE, 8);
-
-	gtk_box_pack_start (GTK_BOX (vbox), box, FALSE, TRUE, 4);
-
-	if (gail_up) {
-		add_atk_namedesc (self->format, "format_entry", _("Enter the cursor offset format"));
-		add_atk_namedesc (self->offset_menu, "format_combobox", _("Select the cursor offset format"));
-		add_atk_relation (label, self->format, ATK_RELATION_LABEL_FOR);
-		add_atk_relation (self->format, label, ATK_RELATION_LABELLED_BY);
-		add_atk_relation (label, self->offset_menu, ATK_RELATION_LABEL_FOR);
-		add_atk_relation (self->offset_menu, label, ATK_RELATION_LABELLED_BY);
-		add_atk_relation (self->format, self->offset_menu, ATK_RELATION_CONTROLLED_BY);
-		add_atk_relation (self->offset_menu, self->format, ATK_RELATION_CONTROLLER_FOR);
-	}
-
-	/* show offsets check button */
-	self->offsets_col = gtk_check_button_new_with_mnemonic (_("Sh_ow offsets column"));
-	g_object_bind_property (G_OBJECT (app), "show-offset", G_OBJECT (self->offsets_col),
-							"active", G_BINDING_SYNC_CREATE | G_BINDING_BIDIRECTIONAL);
-	gtk_box_pack_start (GTK_BOX (vbox), self->offsets_col, FALSE, TRUE, 4);
-	gtk_widget_show (self->offsets_col);
-
-	label = gtk_label_new (_("Editing"));
-	gtk_widget_show (label);
-	gtk_notebook_append_page (GTK_NOTEBOOK(notebook), vbox, label);
-
-	/* display page */
-	vbox = gtk_box_new (GTK_ORIENTATION_VERTICAL, 0);
-	gtk_widget_show(vbox);
-	
-	/* display font */
-	frame = gtk_frame_new (_("Font"));
-	gtk_container_set_border_width (GTK_CONTAINER(frame), 4);
-	gtk_widget_show (frame);
-	
-	fbox = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, 5);
-	self->font_button = gtk_font_button_new ();
-	g_object_bind_property (G_OBJECT (app), "font-name", G_OBJECT (self->font_button),
-							"font", G_BINDING_SYNC_CREATE | G_BINDING_BIDIRECTIONAL);
-	flabel = gtk_label_new ("");
-	gtk_label_set_mnemonic_widget (GTK_LABEL (flabel), self->font_button);
-	gtk_widget_show (flabel);
-	gtk_widget_show (GTK_WIDGET (self->font_button));
-	gtk_container_set_border_width (GTK_CONTAINER (fbox), 4);
-	gtk_box_pack_start (GTK_BOX (fbox), GTK_WIDGET (self->font_button), FALSE, TRUE, 12);
-	
-	gtk_widget_show (fbox);
-	gtk_container_add (GTK_CONTAINER (frame), GTK_WIDGET (fbox));
-	
-	gtk_box_pack_start (GTK_BOX (vbox), frame, TRUE, TRUE, 4);
-	
-	/* default group type */
-	frame = gtk_frame_new (_("Default Group Type"));
-	gtk_container_set_border_width (GTK_CONTAINER (frame), 4);
-	gtk_widget_show (frame);
-
-	box = gtk_box_new (GTK_ORIENTATION_VERTICAL, 0);
-	gtk_widget_show (box);
-	group = NULL;
-	for(i = 0; i < 3; i++) {
-		self->group_type[i] = GTK_RADIO_BUTTON (gtk_radio_button_new_with_mnemonic (group, _(group_type_label[i])));
-		gtk_widget_show (GTK_WIDGET (self->group_type[i]));
-		gtk_box_pack_start (GTK_BOX (box), GTK_WIDGET (self->group_type[i]), TRUE, TRUE, 2);
-		group = gtk_radio_button_get_group (self->group_type[i]);
-	}
-	gtk_container_add (GTK_CONTAINER (frame), box);
-	gtk_box_pack_start (GTK_BOX (vbox), frame, TRUE, TRUE, 4);
-	
-	label = gtk_label_new (_("Display"));
-	gtk_widget_show (label);
-	gtk_notebook_append_page (GTK_NOTEBOOK (notebook), vbox, label);
-	
-	/* printing page */
-	vbox = gtk_box_new (GTK_ORIENTATION_VERTICAL, 0);
-	gtk_widget_show (vbox);
-
-	/* paper selection */
-	frame = gtk_frame_new (_("Paper size"));
-	gtk_container_set_border_width (GTK_CONTAINER (frame), 4);
-	gtk_widget_show (frame);
-
-	/* data & header font selection */
-	frame = gtk_frame_new (_("Fonts"));
-	gtk_container_set_border_width (GTK_CONTAINER (frame), 4);
-	gtk_widget_show (frame);
-
-	grid = gtk_grid_new ();
-	g_object_set (grid,
-	              "orientation", GTK_ORIENTATION_VERTICAL,
-	              "row-spacing", 6,
-	              "column-spacing", 12,
-	              NULL);
-	gtk_widget_show (grid);
-
-	label = gtk_label_new_with_mnemonic (_("_Data font:"));
-	gtk_label_set_xalign (GTK_LABEL (label), 0.0);
-	gtk_label_set_yalign (GTK_LABEL (label), 0.5);
-	gtk_widget_show (label);
-	gtk_container_add (GTK_CONTAINER (grid), label);
-
-	df_button = gtk_font_button_new ();
-	g_object_bind_property (G_OBJECT (app), "data-font", G_OBJECT (df_button),
-							"font", G_BINDING_SYNC_CREATE | G_BINDING_BIDIRECTIONAL);
-	df_label = gtk_label_new ("");
-	gtk_label_set_mnemonic_widget (GTK_LABEL (df_label), df_button);
-
-	gtk_label_set_mnemonic_widget (GTK_LABEL (label), df_button);
-
-	if (gail_up) {
-		add_atk_namedesc (df_button, _("Data font"), _("Select the data font"));
-		add_atk_relation (df_button, label, ATK_RELATION_LABELLED_BY);
-	}	
-	
-	gtk_widget_set_hexpand (df_button, TRUE);
-	gtk_widget_show (df_button);
-	gtk_grid_attach_next_to (GTK_GRID (grid), df_button, label,
-	                         GTK_POS_RIGHT, 1, 1);
-
-	label = gtk_label_new_with_mnemonic (_("Header fo_nt:"));
-	gtk_label_set_xalign (GTK_LABEL (label), 0.0);
-	gtk_label_set_yalign (GTK_LABEL (label), 0.5);
-	gtk_widget_show (label);
-	gtk_container_add (GTK_CONTAINER (grid), label);
-	hf_button = gtk_font_button_new ();
-	g_object_bind_property (G_OBJECT (app), "header-font", G_OBJECT (hf_button),
-							"font", G_BINDING_SYNC_CREATE | G_BINDING_BIDIRECTIONAL);
-	hf_label = gtk_label_new ("");
-	gtk_label_set_mnemonic_widget (GTK_LABEL (hf_label), hf_button);
-
-	gtk_label_set_mnemonic_widget (GTK_LABEL (label), hf_button);
-
-	if (gail_up) {
-		add_atk_namedesc (hf_button, _("Header font"), _("Select the header font"));
-		add_atk_relation (hf_button, label, ATK_RELATION_LABELLED_BY);
-	}
-
-	gtk_widget_set_hexpand (hf_button, TRUE);
-	gtk_widget_show (hf_button);
-	gtk_grid_attach_next_to (GTK_GRID (grid), hf_button, label,
-	                         GTK_POS_RIGHT, 1, 1);
-
-	label = gtk_label_new ("");
-	gtk_widget_set_hexpand (label, TRUE);
-	gtk_widget_show (label);
-	gtk_grid_attach (GTK_GRID (grid), label, 2, 1, 1, 1);
-
-	gtk_container_add (GTK_CONTAINER (frame), grid);
-
-	gtk_box_pack_start (GTK_BOX (vbox), frame, TRUE, TRUE,
-					    4);
-
-	/* shaded box entry */
-	box_adj = GTK_ADJUSTMENT (gtk_adjustment_new (0, 0, 1000, 1, 10, 0));
-
-	box = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, 0);
-	gtk_widget_show (box);
-
-	label = gtk_label_new_with_mnemonic (_("_Print shaded box over:"));
-	gtk_label_set_xalign (GTK_LABEL (label), 1.0);
-	gtk_label_set_yalign (GTK_LABEL (label), 0.5);
-	gtk_box_pack_start (GTK_BOX(box), label, TRUE, TRUE, 4);
-	gtk_widget_show (label);
-						  
-	self->box_size_spin = gtk_spin_button_new (box_adj, 1, 0);
-	gtk_box_pack_start (GTK_BOX(box), GTK_WIDGET (self->box_size_spin), FALSE, TRUE, 8);
-	gtk_widget_show (self->box_size_spin);
-
-	gtk_label_set_mnemonic_widget (GTK_LABEL (label), self->box_size_spin);
-
-	if (gail_up) {
-		add_atk_namedesc (self->box_size_spin, _("Box size"), _("Select size of box (in number of lines)"));
-		add_atk_relation (self->box_size_spin, label, ATK_RELATION_LABELLED_BY);
-	}
-
-	label = gtk_label_new (_("lines (0 for no box)"));
-	gtk_label_set_xalign (GTK_LABEL (label), 0.0);
-	gtk_label_set_yalign (GTK_LABEL (label), 0.5);
-	gtk_box_pack_start (GTK_BOX(box), label, FALSE, TRUE, 4);
-	gtk_widget_show (label);
-
-	gtk_box_pack_start (GTK_BOX (vbox), box, TRUE, TRUE, 4);
-
-	label = gtk_label_new (_("Printing"));
-	gtk_widget_show (label);
-	gtk_notebook_append_page (GTK_NOTEBOOK(notebook), vbox, label);
-
-	for(i = 0; i < 3; i++)
-		g_signal_connect (G_OBJECT (self->group_type[i]), "clicked",
-						  G_CALLBACK(group_type_cb), self);
-
-	g_object_bind_property (G_OBJECT (app), "undo-depth", G_OBJECT (undo_adj),
-						"value", G_BINDING_SYNC_CREATE | G_BINDING_BIDIRECTIONAL);
-	g_object_bind_property (G_OBJECT (app), "shaded-box", G_OBJECT (box_adj),
-						"value", G_BINDING_SYNC_CREATE | G_BINDING_BIDIRECTIONAL);
-
-	/* ======================= */
-	gint             groupid;
-	const gchar     *offset_format;
-
-	groupid = map_group_nick (g_hex_application_get_group_by (app));
-	offset_format = g_hex_application_get_offset_format (app);
-
-	for(gint i = 0; i < 3; i++) {
-		if(groupid == group_type[i]) {
-			gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(self->group_type[i]), TRUE);
-			break;
-		}
-	}
-
-	gtk_widget_set_sensitive(self->format, FALSE);
-	gtk_entry_set_text (GTK_ENTRY (self->format), offset_format);
 	if (strcmp (offset_format, "%d") == 0) {
 		gtk_combo_box_set_active (GTK_COMBO_BOX (self->offset_menu), 0);
 	} else if (strcmp (offset_format, "0x%X") == 0) {
@@ -402,37 +234,111 @@ g_hex_prefrences_init (GHexPreferences *self)
 		gtk_combo_box_set_active (GTK_COMBO_BOX (self->offset_menu), 2);
 		gtk_widget_set_sensitive (self->format, TRUE);
 	}
+	g_signal_connect (G_OBJECT(self->offset_menu), "changed",
+					  G_CALLBACK(offset_cb), self);
+	gtk_box_pack_end (GTK_BOX(control), GTK_WIDGET (self->offset_menu),
+					  FALSE, TRUE, 0);
+	if (gail_up) {
+		add_atk_namedesc (self->format, "format_entry", _("Enter the cursor offset format"));
+		add_atk_namedesc (self->offset_menu, "format_combobox", _("Select the cursor offset format"));
+		add_atk_relation (self->format, self->offset_menu, ATK_RELATION_CONTROLLED_BY);
+		add_atk_relation (self->offset_menu, self->format, ATK_RELATION_CONTROLLER_FOR);
+	}
+	g_hex_preferences_add_row (list, _("Off_set format"), control);
+
+	/* Offset column */
+	control = gtk_switch_new ();
+	gtk_widget_show (control);
+	g_object_bind_property (G_OBJECT (app), "show-offset", G_OBJECT (control),
+							"active", G_BINDING_SYNC_CREATE | G_BINDING_BIDIRECTIONAL);
+	g_hex_preferences_add_row (list, _("Offsets c_olumn"), control);
+
+	/* Display font */
+	control = gtk_font_button_new ();
+	gtk_widget_show (control);
+	g_object_bind_property (G_OBJECT (app), "font-name", G_OBJECT (control),
+							"font", G_BINDING_SYNC_CREATE | G_BINDING_BIDIRECTIONAL);
+	g_hex_preferences_add_row (list, _("_Font"), control);
+	
+	/* Grouping type */
+	control = gtk_combo_box_text_new ();
+	gtk_widget_show (control);
+	gtk_combo_box_text_append (GTK_COMBO_BOX_TEXT (control), "bytes",_("Bytes"));
+	gtk_combo_box_text_append (GTK_COMBO_BOX_TEXT (control), "words",_("Words"));
+	gtk_combo_box_text_append (GTK_COMBO_BOX_TEXT (control), "longwords", _("Longwords"));
+	g_object_bind_property (G_OBJECT (app), "group-by", G_OBJECT (control),
+							"active-id", G_BINDING_SYNC_CREATE | G_BINDING_BIDIRECTIONAL);
+	g_hex_preferences_add_row (list, _("Default _grouping"), control);
+
+
+	gtk_container_add (GTK_CONTAINER (frame), list);
+	gtk_box_pack_start (GTK_BOX (vbox), frame, FALSE, TRUE, 0);
+	gtk_widget_show (frame);
+
+
+	label = g_object_new (GTK_TYPE_LABEL,
+						  "label", _("Printing"),
+						  "halign", GTK_ALIGN_START,
+						  "margin-top", 8,
+						  NULL);
+	gtk_box_pack_start (GTK_BOX (vbox), label, FALSE, TRUE, 0);
+	gtk_widget_show (label);
+
+	frame = gtk_frame_new (NULL);
+
+	list = g_object_new (GTK_TYPE_LIST_BOX,
+						 "selection-mode", GTK_SELECTION_NONE,
+						 "visible", TRUE,
+						 "width-request", 450,
+						 NULL);
+	gtk_list_box_set_header_func (GTK_LIST_BOX (list), g_hex_preferences_header_func, NULL, NULL);
+
+	/* Data print font */
+	control = gtk_font_button_new ();
+	gtk_widget_show (control);
+	g_object_bind_property (G_OBJECT (app), "data-font", G_OBJECT (control),
+							"font", G_BINDING_SYNC_CREATE | G_BINDING_BIDIRECTIONAL);
+	if (gail_up) {
+		add_atk_namedesc (control, _("Data font"), _("Select the data font"));
+	}
+	g_hex_preferences_add_row (list, _("_Data font"), control);
+
+	/* Header print font */
+	control = gtk_font_button_new ();
+	gtk_widget_show (control);
+	g_object_bind_property (G_OBJECT (app), "header-font", G_OBJECT (control),
+							"font", G_BINDING_SYNC_CREATE | G_BINDING_BIDIRECTIONAL);
+	if (gail_up) {
+		add_atk_namedesc (control, _("Header font"), _("Select the header font"));
+	}
+	g_hex_preferences_add_row (list, _("Header fo_nt"), control);
+
+	/* shaded box entry */
+	box_adj = GTK_ADJUSTMENT (gtk_adjustment_new (0, 0, 1000, 1, 10, 0));
+	g_object_bind_property (G_OBJECT (app), "shaded-box", G_OBJECT (box_adj),
+						"value", G_BINDING_SYNC_CREATE | G_BINDING_BIDIRECTIONAL);
+	control = gtk_spin_button_new (box_adj, 1, 0);
+	gtk_widget_show (control);
+	if (gail_up) {
+		add_atk_namedesc (control, _("Box size"), _("Select size of box (in number of lines)"));
+	}
+	g_hex_preferences_add_row (list, _("Lines to _print shaded box over"), control);
+
+	gtk_container_add (GTK_CONTAINER (frame), list);
+	gtk_box_pack_start (GTK_BOX (vbox), frame, FALSE, TRUE, 0);
+	gtk_widget_show (frame);
 }
 
 GtkWidget *
-g_hex_prefrences_new (GHexWindow *parent)
+g_hex_preferences_new (GHexWindow *parent)
 {
 	return g_object_new (G_HEX_TYPE_PREFERENCES,
 						 "use-header-bar", TRUE,
 						 "modal", TRUE,
 						 "transient-for", parent,
+						 "resizable", FALSE,
 						 "title", _("GHex Preferences"),
 						 NULL);
-}
-
-static void
-group_type_cb(GtkRadioButton *rd, GHexPreferences *pui)
-{
-	int i;
-	GHexApplication *app;
-	gint group;
-
-	app = G_HEX_APPLICATION (g_application_get_default ());
-	group = map_group_nick (g_hex_application_get_group_by (app));
-
-	for(i = 0; i < 3; i++) {
-		if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(pui->group_type[i]))) {
-			group = group_type[i];
-			break;
-		}
-	}
-
-	g_hex_application_set_group_by (app, map_nick_group (group));
 }
 
 static void

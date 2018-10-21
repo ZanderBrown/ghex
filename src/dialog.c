@@ -46,5 +46,10 @@ g_hex_dialog_class_init (GHexDialogClass *klass)
 static void
 g_hex_dialog_init (GHexDialog *self)
 {
+	GtkWidget *content;
+
+	content = gtk_dialog_get_content_area (GTK_DIALOG (self));
+
+	gtk_container_set_border_width (GTK_CONTAINER (content), 0);
 }
 
