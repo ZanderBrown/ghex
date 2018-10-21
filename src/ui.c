@@ -260,53 +260,55 @@ open_cb (GSimpleAction *action,
          GVariant *value,
          GHexWindow *window)
 {
-	GHexWindow *win;
-	GtkWidget *file_sel;
-	GtkResponseType resp;
+	GHexApplication *app;
+	GHexWindow      *win;
+	GtkWidget       *file_sel;
+	GtkResponseType  resp;
 
-	win = GHEX_WINDOW(window);
+	app = G_HEX_APPLICATION (gtk_window_get_application (GTK_WINDOW (window)));
+	win = window;
 
-	file_sel = gtk_file_chooser_dialog_new(_("Select a file to open"),
-										   GTK_WINDOW(win),
-										   GTK_FILE_CHOOSER_ACTION_OPEN,
-										   _("Cancel"), GTK_RESPONSE_CANCEL,
-										   _("Open"), GTK_RESPONSE_OK,
-										   NULL);
-	gtk_window_set_modal (GTK_WINDOW(file_sel), TRUE);
+	file_sel = gtk_file_chooser_dialog_new (_("Select a file to open"),
+										    GTK_WINDOW (window),
+										    GTK_FILE_CHOOSER_ACTION_OPEN,
+										    _("Cancel"), GTK_RESPONSE_CANCEL,
+										    _("Open"), GTK_RESPONSE_OK,
+										    NULL);
+	gtk_window_set_modal (GTK_WINDOW (file_sel), TRUE);
 	gtk_window_set_position (GTK_WINDOW (file_sel), GTK_WIN_POS_MOUSE);
 	gtk_widget_show (file_sel);
 
-	resp = gtk_dialog_run(GTK_DIALOG(file_sel));
+	resp = gtk_dialog_run (GTK_DIALOG (file_sel));
 
-	if(resp == GTK_RESPONSE_OK) {
+	if (resp == GTK_RESPONSE_OK) {
 		gchar *flash;
 
-		if(GHEX_WINDOW(win)->gh != NULL) {
+		if (GHEX_WINDOW (win)->gh != NULL) {
 			win = GHEX_WINDOW (ghex_window_new_from_file (G_HEX_APPLICATION (g_application_get_default ()),
 			                                              gtk_file_chooser_get_filename (GTK_FILE_CHOOSER (file_sel))));
-			if(win != NULL)
-				gtk_widget_show(GTK_WIDGET(win));
-		}
-		else {
-			if(!ghex_window_load(GHEX_WINDOW(win),
-								 gtk_file_chooser_get_filename (GTK_FILE_CHOOSER (file_sel))))
+			if (win)
+				gtk_widget_show (GTK_WIDGET (win));
+		} else {
+			if (!ghex_window_load (GHEX_WINDOW (win),
+								   gtk_file_chooser_get_filename (GTK_FILE_CHOOSER (file_sel))))
 				win = NULL;
 		}
 
-		if(win != NULL) {
+		if (win) {
 			gchar *gtk_file_name;
 			gtk_file_name = g_filename_to_utf8
-				(GHEX_WINDOW(win)->gh->document->file_name, -1, 
+				(GHEX_WINDOW (win)->gh->document->file_name, -1,
 				 NULL, NULL, NULL);
-			flash = g_strdup_printf(_("Loaded file %s"), gtk_file_name);
-			ghex_window_flash(GHEX_WINDOW(win), flash);
-			g_free(gtk_file_name);
-			g_free(flash);
+			flash = g_strdup_printf (_("Loaded file %s"), gtk_file_name);
+			ghex_window_flash (GHEX_WINDOW (win), flash);
+			g_free (gtk_file_name);
+			g_free (flash);
 			if (win->converter && GTK_IS_WIDGET (win->converter))
 				g_hex_converter_set_can_grap (G_HEX_CONVERTER (win->converter), TRUE);
+		} else {
+			win = GHEX_WINDOW (gtk_application_get_active_window (GTK_APPLICATION (app)));
+			display_error_dialog (GTK_WIDGET (win), _("Can not open file!"));
 		}
-		else
-			display_error_dialog (GTK_WIDGET (ghex_window_get_active()), _("Can not open file!"));
 	}
 
 	gtk_widget_destroy(file_sel);
@@ -467,50 +469,57 @@ close_cb (GSimpleAction *action,
           GVariant *value,
           GHexWindow *window)
 {
-	GHexWindow *win = GHEX_WINDOW(window), *other_win;
-	HexDocument *doc;
-	const GList *window_list;
+	GHexApplication *app;
+	GHexWindow      *other_win;
+	HexDocument     *doc;
+	GList           *window_list;
 
-	if(win->gh == NULL) {
-        if(ghex_window_get_list()->next != NULL)
-            gtk_widget_destroy(GTK_WIDGET(win));
+	app = G_HEX_APPLICATION (gtk_window_get_application (GTK_WINDOW (window)));
+	window_list = gtk_application_get_windows (GTK_APPLICATION (app));
+
+	if (window->gh == NULL) {
+		if (window_list->next && GHEX_IS_WINDOW (window_list->data))
+			gtk_widget_destroy (GTK_WIDGET (window));
 		return;
 	}
 
-	doc = win->gh->document;
+	doc = window->gh->document;
 	
-	if(!ghex_window_ok_to_close(win))
+	if (!ghex_window_ok_to_close (window))
 		return;
 	
-	window_list = ghex_window_get_list();
+	window_list = gtk_application_get_windows (GTK_APPLICATION (app));
 	while(window_list) {
-		other_win = GHEX_WINDOW(window_list->data);
-		window_list = window_list->next;
-		if(other_win->gh && other_win->gh->document == doc && other_win != win)
-			gtk_widget_destroy(GTK_WIDGET(other_win));
+		if (GHEX_IS_WINDOW (window_list->data)) {
+			other_win = GHEX_WINDOW(window_list->data);
+			window_list = window_list->next;
+			if(other_win->gh && other_win->gh->document == doc && other_win != window)
+				gtk_widget_destroy(GTK_WIDGET(other_win));
+		}
 	}
 
 
 	/* If we have created the converter window disable the 
 	 * "Get cursor value" button
 	 */
-	if (win->converter && GTK_IS_WIDGET (win->converter))
-		g_hex_converter_set_can_grap (G_HEX_CONVERTER (win->converter), FALSE);
+	if (window->converter && GTK_IS_WIDGET (window->converter))
+		g_hex_converter_set_can_grap (G_HEX_CONVERTER (window->converter), FALSE);
 
-    if(ghex_window_get_list()->next == NULL) {
-        ghex_window_destroy_contents (win);
-		win->gh = NULL;
-        ghex_window_set_sensitivity(win);
-		ghex_window_set_doc_name(win, NULL);
+	window_list = gtk_application_get_windows (GTK_APPLICATION (app));
+	if (window_list->next == NULL) {
+		ghex_window_destroy_contents (window);
+		window->gh = NULL;
+		ghex_window_set_sensitivity (window);
+		ghex_window_set_doc_name (window, NULL);
 
         /* Clear the contents of status bar after closing the files */
-        ghex_window_show_status (win, " ");
-    }
-    else
-        gtk_widget_destroy(GTK_WIDGET(win));	
+        ghex_window_show_status (window, " ");
+    } else {
+        gtk_widget_destroy (GTK_WIDGET (window));
+	}
 
     /* this implicitly destroys all views including this one */
-    g_object_unref(G_OBJECT(doc));
+    g_object_unref (G_OBJECT (doc));
 }
 
 void

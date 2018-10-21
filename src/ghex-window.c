@@ -48,9 +48,6 @@ typedef void (*Action)(GSimpleAction *action, GVariant *param, gpointer data);
 
 G_DEFINE_TYPE (GHexWindow, ghex_window, GTK_TYPE_APPLICATION_WINDOW)
 
-static GList *window_list = NULL;
-static GHexWindow *active_window = NULL;
-
 /* what can be dragged in us... */
 enum {
     TARGET_URI_LIST,
@@ -143,8 +140,8 @@ ghex_window_close(GHexWindow *win)
 	if (win->converter && GTK_IS_WIDGET (win->converter))
 		g_hex_converter_set_can_grap (G_HEX_CONVERTER (win->converter), FALSE);
 
-	if (win->advanced_find_dialog)
-		gtk_widget_destroy (win->advanced_find_dialog);
+	if (win->find_advanced)
+		gtk_widget_destroy (win->find_advanced);
 
 	gtk_widget_destroy(GTK_WIDGET(win));
 
@@ -152,17 +149,6 @@ ghex_window_close(GHexWindow *win)
 		g_object_unref (G_OBJECT (doc));
 
 	return TRUE;
-}
-
-static gboolean 
-ghex_window_focus_in_event(GtkWidget *win, GdkEventFocus *event)
-{
-    active_window = GHEX_WINDOW(win);
-
-    if (GTK_WIDGET_CLASS (ghex_window_parent_class)->focus_in_event)
-        return GTK_WIDGET_CLASS (ghex_window_parent_class)->focus_in_event (win, event);
-    else
-        return TRUE;
 }
 
 static void
@@ -277,38 +263,30 @@ ghex_window_doc_changed(HexDocument *doc, HexChangeData *change_data,
 static void
 ghex_window_destroy (GtkWidget *object)
 {
-        GHexWindow *win;
+	GHexWindow *win;
 
-        g_return_if_fail(object != NULL);
-        g_return_if_fail(GHEX_IS_WINDOW(object));
+	g_return_if_fail (object);
+	g_return_if_fail (GHEX_IS_WINDOW (object));
 
-        win = GHEX_WINDOW(object);
+	win = GHEX_WINDOW (object);
 
-        if(win->gh) {
-            hex_document_remove_view(win->gh->document, GTK_WIDGET(win->gh));
-            g_signal_handlers_disconnect_matched(win->gh->document,
-                                                 G_SIGNAL_MATCH_FUNC | G_SIGNAL_MATCH_DATA,
-                                                 0, 0, NULL,
-                                                 ghex_window_doc_changed,
-                                                 win);
-            win->gh = NULL;
-        }
+	if (win->gh) {
+		hex_document_remove_view (win->gh->document, GTK_WIDGET (win->gh));
+		g_signal_handlers_disconnect_matched (win->gh->document,
+											  G_SIGNAL_MATCH_FUNC | G_SIGNAL_MATCH_DATA,
+											  0, 0, NULL,
+											  ghex_window_doc_changed,
+											  win);
+		win->gh = NULL;
+	}
 
-        if (win->dialog)
-        {
-            g_object_unref (G_OBJECT(win->dialog));
-            win->dialog = NULL;
-        }
+	if (win->dialog) {
+		g_object_unref (G_OBJECT(win->dialog));
+		win->dialog = NULL;
+	}
 
-        window_list = g_list_remove(window_list, win);
-
-        if (window_list == NULL)
-            active_window = NULL;
-        else if(active_window == win)
-            active_window = GHEX_WINDOW(window_list->data);
-
-        if (GTK_WIDGET_CLASS (ghex_window_parent_class)->destroy)
-            GTK_WIDGET_CLASS (ghex_window_parent_class)->destroy (object);
+	if (GTK_WIDGET_CLASS (ghex_window_parent_class)->destroy)
+		GTK_WIDGET_CLASS (ghex_window_parent_class)->destroy (object);
 }
 
 static gboolean
@@ -562,26 +540,27 @@ ghex_window_class_init(GHexWindowClass *class)
 	widget_class->delete_event = ghex_window_delete_event;
 	widget_class->destroy = ghex_window_destroy;
 	widget_class->drag_data_received = ghex_window_drag_data_received;
-    widget_class->focus_in_event = ghex_window_focus_in_event;
 }
 
 static void
 ghex_window_init (GHexWindow *window)
 {
-    window_list = g_list_prepend(window_list, window);
 }
 
 void
 ghex_window_sync_converter_item(GHexWindow *win, gboolean state)
 {
-    const GList *wnode;
+	GHexApplication *app;
+	GList           *win_node;
 
-    wnode = ghex_window_get_list();
-    while(wnode) {
-        if(GHEX_WINDOW(wnode->data) != win)
-            ghex_window_set_toggle_action_active (GHEX_WINDOW (wnode->data), "type-tool", state);
-        wnode = wnode->next;
-    }
+	app = G_HEX_APPLICATION (gtk_window_get_application (GTK_WINDOW (win)));
+	win_node = gtk_application_get_windows (GTK_APPLICATION (app));
+
+	while (win_node) {
+		if (GHEX_IS_WINDOW (win_node->data) && GHEX_WINDOW (win_node->data) != win)
+			ghex_window_set_toggle_action_active (GHEX_WINDOW (win_node->data), "type-tool", state);
+		win_node = g_list_next (win_node);
+	}
 }
 
 GtkWidget *
@@ -809,18 +788,6 @@ ghex_window_load(GHexWindow *win, const gchar *filename)
     return TRUE;
 }
 
-const GList *
-ghex_window_get_list()
-{
-    return window_list;
-}
-
-GHexWindow *
-ghex_window_get_active()
-{
-    return active_window;
-}
-
 void
 ghex_window_set_doc_name(GHexWindow *win, const gchar *name)
 {
@@ -921,17 +888,21 @@ ghex_window_flash (GHexWindow * win, const gchar * flash)
 GHexWindow *
 ghex_window_find_for_doc(HexDocument *doc)
 {
-    const GList *win_node;
-    GHexWindow *win;
+	GHexApplication *app;
+	GList           *win_node;
+	GHexWindow      *win;
 
-    win_node = ghex_window_get_list();
-    while(win_node) {
-        win = GHEX_WINDOW(win_node->data);
-        if(win->gh && win->gh->document == doc)
-            return win;
-        win_node = win_node->next;
-    }
-    return NULL;
+	app = G_HEX_APPLICATION (g_application_get_default ());
+	win_node = gtk_application_get_windows (GTK_APPLICATION (app));
+	while (win_node) {
+		if (GHEX_IS_WINDOW (win_node->data)) {
+			win = GHEX_WINDOW(win_node->data);
+			if (win->gh && win->gh->document == doc)
+				return win;
+			win_node = g_list_next (win_node);
+		}
+	}
+	return NULL;
 }
 
 gboolean

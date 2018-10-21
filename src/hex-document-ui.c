@@ -82,11 +82,11 @@ advanced_find_cb (GSimpleAction *action,
                   GVariant *value,
                   GHexWindow *window)
 {
-	GtkWidget *dialog;
+	if (G_LIKELY (!window->find_advanced || !GTK_IS_WIDGET (window->find_advanced))) {
+		window->find_advanced = g_hex_find_advanced_new (window);
+	}
 
-	dialog = g_hex_find_advanced_new (window);
-
-	gtk_window_present (GTK_WINDOW (dialog));
+	gtk_window_present (GTK_WINDOW (window->find_advanced));
 }
 
 

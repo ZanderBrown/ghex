@@ -743,6 +743,7 @@ g_hex_find_advanced_new (GHexWindow *parent)
 					   "transient-for", parent,
 					   "resizable", TRUE,
 					   "height-request", 300,
+					   "title", _("Advanced Find"),
 					   NULL);
 }
 

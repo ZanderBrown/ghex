@@ -61,10 +61,10 @@ struct _GHexWindow
     struct _HexDialog *dialog;
     GtkWidget *dialog_widget;
 
-    GtkWidget *advanced_find_dialog;
 
     GtkWidget *characters;
     GtkWidget *converter;
+    GtkWidget *find_advanced;
 };
 
 struct _GHexWindowClass
@@ -82,8 +82,6 @@ void              ghex_window_set_contents       (GHexWindow *win, GtkWidget  *c
 void              ghex_window_destroy_contents   (GHexWindow *win);
 gboolean          ghex_window_load(GHexWindow *win, const gchar *filename);
 gboolean          ghex_window_close              (GHexWindow *win);
-const GList       *ghex_window_get_list          (void);
-GHexWindow        *ghex_window_get_active        (void);
 void              ghex_window_set_doc_name       (GHexWindow *win,
                                                   const gchar *name);
 void              ghex_window_set_sensitivity    (GHexWindow *win);
