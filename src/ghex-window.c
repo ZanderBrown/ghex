@@ -358,7 +358,7 @@ static const GActionEntry gaction_entries [] = {
     { "insert", NULL, NULL, "false", ACTION (insert_mode_cb) },
 
     // Group data by 8/16/32 bits
-    { "group", NULL, "s", "'byte'", ACTION (group_data_cb) },
+    { "group", NULL, "s", "'bytes'", ACTION (group_data_cb) },
 
     // Show the character table
     { "char-table", ACTION (character_table_cb) },
@@ -455,9 +455,9 @@ ghex_window_constructor (GType                  type,
     gtk_widget_show (window->statusbar_insert_mode);
 
     section = g_menu_new ();
-    g_menu_append (section, _("Byte"), "win.group::byte");
-    g_menu_append (section, _("Word"), "win.group::word");
-    g_menu_append (section, _("Longword"), "win.group::longword");
+    g_menu_append (section, _("Byte"), "win.group::bytes");
+    g_menu_append (section, _("Word"), "win.group::words");
+    g_menu_append (section, _("Longword"), "win.group::longwords");
 
     window->statusbar_display_mode_btn = gtk_menu_button_new ();
     gtk_menu_button_set_menu_model (GTK_MENU_BUTTON (window->statusbar_display_mode_btn),
@@ -614,17 +614,25 @@ ghex_window_new (GHexApplication *application)
 }
 
 static GtkWidget *
-create_document_view(HexDocument *doc)
+create_document_view(GHexWindow *win, HexDocument *doc)
 {
-    GtkWidget *gh = hex_document_add_view(doc);
+	PangoFontMetrics     *metrics;
+	PangoFontDescription *desc;
+	GHexApplication      *app;
+	const gchar          *group;
+	GtkWidget            *gh = hex_document_add_view(doc);
 
-	gtk_hex_set_group_type(GTK_HEX(gh), def_group_type);
+	app = G_HEX_APPLICATION (gtk_window_get_application (GTK_WINDOW (win)));
+	group = g_hex_application_get_group_by (app);
+	g_hex_application_get_font (app, &metrics, &desc);
 
-	if (def_metrics && def_font_desc) {
-		gtk_hex_set_font(GTK_HEX(gh), def_metrics, def_font_desc);
+	gtk_hex_set_group_type(GTK_HEX(gh), map_group_nick (group));
+
+	if (metrics && desc) {
+		gtk_hex_set_font(GTK_HEX(gh), metrics, desc);
 	}
 
-    return gh;
+	return gh;
 }
 
 GtkWidget *
@@ -632,7 +640,7 @@ ghex_window_new_from_doc (GHexApplication *application,
                           HexDocument    *doc)
 {
     GtkWidget *win = ghex_window_new (application);
-    GtkWidget *gh = create_document_view(doc);
+    GtkWidget *gh = create_document_view(GHEX_WINDOW (win), doc);
 
     gtk_widget_show(gh);
     GHEX_WINDOW(win)->gh = GTK_HEX(gh);
@@ -665,26 +673,31 @@ ghex_window_update_status_message(GHexWindow *win)
 {
 #define FMT_LEN    128
 #define STATUS_LEN 128
-
+	GHexApplication *app;
     gchar fmt[FMT_LEN], status[STATUS_LEN];
     gint current_pos;
     gint ss, se, len;
+	const gchar     *offset_format;
+
+	app = G_HEX_APPLICATION (gtk_window_get_application (GTK_WINDOW (win)));
 
     if(NULL == win->gh) {
         ghex_window_show_status(win, " ");
         return;
     }
 
+	offset_format = g_hex_application_get_offset_format (app);
+
 #if defined(__GNUC__) && (__GNUC__ > 4)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wformat-nonliteral"
 #endif
     current_pos = gtk_hex_get_cursor(win->gh);
-    if(g_snprintf(fmt, FMT_LEN, _("Offset: %s"), offset_fmt) < FMT_LEN) {
+    if(g_snprintf(fmt, FMT_LEN, _("Offset: %s"), offset_format) < FMT_LEN) {
         g_snprintf(status, STATUS_LEN, fmt, current_pos);
         if(gtk_hex_get_selection(win->gh, &ss, &se)) {
             if(g_snprintf(fmt, FMT_LEN, _("; %s bytes from %s to %s selected"),
-                          offset_fmt, offset_fmt, offset_fmt) < FMT_LEN) {
+                          offset_format, offset_format, offset_format) < FMT_LEN) {
                 len = strlen(status);
                 if(len < STATUS_LEN) {
                     // Variables 'ss' and 'se' denotes the offsets of the first and
@@ -724,21 +737,28 @@ cursor_moved_cb(GtkHex *gtkhex, gpointer user_data)
 gboolean
 ghex_window_load(GHexWindow *win, const gchar *filename)
 {
-    HexDocument *doc;
-    GtkWidget *gh;
-    GtkWidget *vbox;
-    gboolean active;
+    HexDocument     *doc;
+    GtkWidget       *gh;
+    GtkWidget       *vbox;
+    gboolean         active;
+	GHexApplication *app;
+	gboolean         show_offset;
+	guint            undo_depth;
 
     g_return_val_if_fail(win != NULL, FALSE);
     g_return_val_if_fail(GHEX_IS_WINDOW(win), FALSE);
     g_return_val_if_fail(filename != NULL, FALSE);
 
+	app = G_HEX_APPLICATION (g_application_get_default ());
+	show_offset = g_hex_application_get_show_offset (app);
+	undo_depth = g_hex_application_get_undo_depth (app);
+
     doc = hex_document_new_from_file (filename);
     if(!doc)
         return FALSE;
-    hex_document_set_max_undo(doc, max_undo_depth);
-    gh = create_document_view(doc);
-    gtk_hex_show_offsets(GTK_HEX(gh), show_offsets_column);
+    hex_document_set_max_undo(doc, undo_depth);
+    gh = create_document_view(win, doc);
+    gtk_hex_show_offsets(GTK_HEX(gh), show_offset);
     g_signal_connect(G_OBJECT(doc), "document_changed",
                      G_CALLBACK(ghex_window_doc_changed), win);
     g_signal_connect(G_OBJECT(doc), "undo",

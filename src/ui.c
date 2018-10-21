@@ -589,26 +589,57 @@ type_dialog_cb (GSimpleAction *action,
     }
 }
 
+gint
+map_group_nick (const gchar* nick)
+{
+	g_message ("Nick %s", nick);
+	if (g_strcmp0(nick, "words") == 0) {
+		g_message ("Word");
+		return GROUP_WORD;
+	} else if (g_strcmp0(nick, "longwords") == 0) {
+		g_message ("Long");
+		return GROUP_LONG;
+	}
+	g_message ("Byte");
+	return GROUP_BYTE;
+}
+
+const gchar*
+map_nick_group (gint group)
+{
+	g_message ("Group %i", group);
+	if (group == GROUP_WORD) {
+		g_message ("Word");
+		return "words";
+	} else if (group == GROUP_LONG) {
+		g_message ("Long");
+		return "longwords";
+	}
+	g_message ("Byte");
+	return "bytes";
+}
+
 void
 group_data_cb (GSimpleAction *action,
                GVariant *value,
                GHexWindow *window)
 {
-    const gchar *arg;
-    guint        mode;
+	const gchar *arg;
+	guint        mode;
 
-    mode = GROUP_BYTE;
-    arg = g_variant_get_string (value, NULL);
+	arg = g_variant_get_string (value, NULL);
+	mode = map_group_nick (arg);
 
-    if (g_strcmp0(arg, "word") == 0) {
-        mode = GROUP_WORD;
-        gtk_label_set_text (GTK_LABEL (window->statusbar_display_mode), "Word");
-    } else if (g_strcmp0(arg, "longword") == 0) {
-        mode = GROUP_LONG;
-        gtk_label_set_text (GTK_LABEL (window->statusbar_display_mode), "Longword");
-    } else {
-        gtk_label_set_text (GTK_LABEL (window->statusbar_display_mode), "Byte");
-    }
+	switch (mode) {
+		case GROUP_WORD:
+			gtk_label_set_text (GTK_LABEL (window->statusbar_display_mode), "Word");
+			break;
+		case GROUP_LONG:
+			gtk_label_set_text (GTK_LABEL (window->statusbar_display_mode), "Longword");
+			break;
+		default:
+			gtk_label_set_text (GTK_LABEL (window->statusbar_display_mode), "Byte");
+	}
 
     g_simple_action_set_state (action, value);
 
@@ -808,15 +839,25 @@ add_view_cb (GSimpleAction *action,
 
 GtkWidget *create_hex_view(HexDocument *doc)
 {
-    GtkWidget *gh = hex_document_add_view(doc);
+	PangoFontMetrics     *metrics;
+	PangoFontDescription *desc;
+	GHexApplication      *app;
+	gint group;
+	GtkWidget *gh = hex_document_add_view(doc);
 
-	gtk_hex_set_group_type(GTK_HEX(gh), def_group_type);
-	if (def_metrics && def_font_desc) {
-		gtk_hex_set_font(GTK_HEX(gh), def_metrics, def_font_desc);
+	app = G_HEX_APPLICATION (g_application_get_default ());
+
+	group = map_group_nick (g_hex_application_get_group_by (app));
+	gtk_hex_set_group_type(GTK_HEX(gh), group);
+
+	g_hex_application_get_font (app, &metrics, &desc);
+	if (metrics && desc) {
+		gtk_hex_set_font(GTK_HEX(gh), metrics, desc);
 	}
 	gtk_hex_set_insert_mode(GTK_HEX(gh), TRUE);
 	gtk_hex_set_geometry(GTK_HEX(gh), 16, 4);
-    return gh;
+
+	return gh;
 }
 
 gint get_search_string(HexDocument *doc, gchar **str)

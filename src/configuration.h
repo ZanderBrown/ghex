@@ -41,26 +41,6 @@ G_BEGIN_DECLS
 #define GHEX_PREF_BOX_SIZE           "print-shaded-rows"
 #define GHEX_PREF_OFFSETS_COLUMN     "show-offsets"
 
-/* our preferred settings; as only one copy of them is required,
-   we'll make them global vars, although this is a bit ugly */
-extern PangoFontMetrics *def_metrics;
-extern PangoFontDescription *def_font_desc;
-
-extern gchar      *def_font_name;
-extern gchar      *data_font_name, *header_font_name;
-extern gdouble    data_font_size, header_font_size;    
-extern guint      max_undo_depth;
-extern gchar      *offset_fmt;
-extern gboolean   show_offsets_column;
-
-extern guint      shaded_box_size;
-extern gint       def_group_type;
-
-extern GSettings *settings;
-
-/* Initializes the gsettings client */
-void ghex_init_configuration (void);
-
 G_END_DECLS
 
 #endif /* !__GHEX_CONFIGURATION_H__ */

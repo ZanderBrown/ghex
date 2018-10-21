@@ -77,6 +77,8 @@ void about_cb (GSimpleAction *action, GVariant *value, GHexWindow *window);
 /* tmp utils */
 GtkWidget *create_hex_view(HexDocument *doc);
 gint get_search_string(HexDocument *doc, gchar **str);
+gint map_group_nick (const gchar* nick);
+const gchar* map_nick_group (gint group);
 
 G_END_DECLS
 

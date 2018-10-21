@@ -32,7 +32,52 @@ G_BEGIN_DECLS
 G_DECLARE_FINAL_TYPE (GHexApplication, g_hex_application, G_HEX, APPLICATION, GtkApplication)
 
 GHexApplication *
-g_hex_application_new ();
+g_hex_application_new              ();
+
+void
+g_hex_application_set_group_by      (GHexApplication        *self,
+                                     const gchar            *group_by);
+const gchar *
+g_hex_application_get_group_by      (GHexApplication        *self);
+void
+g_hex_application_set_shaded_box    (GHexApplication        *self,
+                                     guint                   shaded_box);
+guint
+g_hex_application_get_shaded_box    (GHexApplication        *self);
+void
+g_hex_application_set_data_font     (GHexApplication       *self,
+                                    const gchar            *data_font);
+const gchar *
+g_hex_application_get_data_font     (GHexApplication       *self);
+void
+g_hex_application_set_header_font   (GHexApplication       *self,
+                                     const gchar           *header_font);
+const gchar *
+g_hex_application_get_header_font   (GHexApplication       *self);
+void
+g_hex_application_set_font_name     (GHexApplication       *self,
+                                     const gchar           *font);
+const gchar *
+g_hex_application_get_font_name     (GHexApplication       *self);
+void
+g_hex_application_get_font          (GHexApplication       *self,
+                                     PangoFontMetrics     **metrics,
+                                     PangoFontDescription **desc);
+void
+g_hex_application_set_show_offset   (GHexApplication *self,
+                                     gboolean         show_offet);
+gboolean
+g_hex_application_get_show_offset   (GHexApplication *self);
+void
+g_hex_application_set_undo_depth    (GHexApplication        *self,
+                                     guint                   undo_depth);
+guint
+g_hex_application_get_undo_depth    (GHexApplication        *self);
+void
+g_hex_application_set_offset_format (GHexApplication       *self,
+                                     const gchar           *offset_format);
+const gchar *
+g_hex_application_get_offset_format (GHexApplication       *self);
 
 G_END_DECLS
 
