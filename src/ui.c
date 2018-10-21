@@ -656,8 +656,6 @@ prefs_cb (GSimpleAction *action,
 
 	dialog = g_hex_prefrences_new (window);
 
-	set_current_prefs(G_HEX_PREFERENCES (dialog));
-
 	gtk_window_present (GTK_WINDOW (dialog));
 }
 

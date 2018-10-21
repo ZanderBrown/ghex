@@ -37,8 +37,6 @@ GtkWidget *g_hex_prefrences_new (GHexWindow *parent);
 extern guint group_type[3];
 extern gchar *group_type_label[3];
 
-void       set_current_prefs(GHexPreferences *pui);
-
 G_END_DECLS
 
 #endif /* !__GHEX_PREFERENCES_H__ */

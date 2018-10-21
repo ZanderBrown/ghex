@@ -36,13 +36,7 @@
 
 #define MAX_MAX_UNDO_DEPTH 100000
 
-static void select_font_cb(GtkWidget *w, GHexPreferences *pui);
-static void select_display_font_cb(GtkWidget *w, GHexPreferences *pui);
-static void max_undo_changed_cb(GtkAdjustment *adj, GHexPreferences *pui);
-static void box_size_changed_cb(GtkAdjustment *adj, GHexPreferences *pui);
 static void offset_cb(GtkWidget *w, GHexPreferences *pui);
-static void prefs_response_cb(GHexPreferences *self, gint response, gpointer data);
-static void offsets_col_cb(GtkToggleButton *tb, GHexPreferences *pui);
 static void group_type_cb(GtkRadioButton *rd, GHexPreferences *pui);
 static void format_activated_cb(GtkEntry *entry, GHexPreferences *pui);
 static gboolean format_focus_out_event_cb(GtkEntry *entry, GdkEventFocus *event,
@@ -57,15 +51,45 @@ struct _GHexPreferences
 	GtkWidget      *offset_menu, *offset_choice[3];
 	GtkWidget      *format, *offsets_col;
 	GtkWidget      *paper_sel, *print_font_sel;
-	GtkWidget      *df_button, *hf_button;
-	GtkWidget      *df_label, *hf_label;
 };
 
 G_DEFINE_TYPE (GHexPreferences, g_hex_prefrences, G_HEX_TYPE_DIALOG)
 
 static void
+g_hex_prefrences_response (GtkDialog *self, gint response)
+{
+	GError *error = NULL;
+
+	switch(response) {
+	case GTK_RESPONSE_HELP:
+		gtk_show_uri_on_window (GTK_WINDOW (self), "help:ghex/ghex-prefs", GDK_CURRENT_TIME, &error);
+		if(NULL != error) {
+			GtkWidget *dialog;
+			dialog = gtk_message_dialog_new
+				(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_CLOSE,
+				 _("There was an error displaying help: \n%s"),
+				 error->message);
+			g_signal_connect (G_OBJECT (dialog), "response",
+							  G_CALLBACK (gtk_widget_destroy),
+							  NULL);
+			gtk_window_set_resizable (GTK_WINDOW (dialog), FALSE);
+			gtk_window_present (GTK_WINDOW (dialog));
+
+			g_error_free(error);
+		}
+		break;
+	default:
+		gtk_widget_destroy (GTK_WIDGET (self));
+		break;
+	}
+}
+
+static void
 g_hex_prefrences_class_init (GHexPreferencesClass *klass)
 {
+	GtkDialogClass *dialog_class = GTK_DIALOG_CLASS (klass);
+
+	dialog_class->response = g_hex_prefrences_response;
 }
 
 static void
@@ -75,9 +99,10 @@ g_hex_prefrences_init (GHexPreferences *self)
 	GtkAdjustment *undo_adj, *box_adj;
 	GtkWidget *notebook;
 	GHexApplication      *app;
-	const gchar          *font;
-	gboolean              show_offset;
 	guint                 undo_depth;
+
+	GtkWidget *df_button, *df_label;
+	GtkWidget *hf_button, *hf_label;
 
 	GSList *group;
 
@@ -86,14 +111,11 @@ g_hex_prefrences_init (GHexPreferences *self)
 	gboolean gail_up;
 
 	app = G_HEX_APPLICATION (g_application_get_default ());
-	show_offset = g_hex_application_get_show_offset (app);
 	undo_depth = g_hex_application_get_undo_depth (app);
 
 
 	gtk_dialog_add_button (GTK_DIALOG (self), _("Close"), GTK_RESPONSE_CLOSE);
 	gtk_dialog_add_button (GTK_DIALOG (self), _("Help"), GTK_RESPONSE_HELP);
-
-	g_signal_connect(G_OBJECT(self), "response", G_CALLBACK(prefs_response_cb), NULL);
 
 	notebook = gtk_notebook_new ();
 	gtk_widget_show (notebook);
@@ -178,7 +200,8 @@ g_hex_prefrences_init (GHexPreferences *self)
 
 	/* show offsets check button */
 	self->offsets_col = gtk_check_button_new_with_mnemonic (_("Sh_ow offsets column"));
-	gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON(self->offsets_col), show_offset);
+	g_object_bind_property (G_OBJECT (app), "show-offset", G_OBJECT (self->offsets_col),
+							"active", G_BINDING_SYNC_CREATE | G_BINDING_BIDIRECTIONAL);
 	gtk_box_pack_start (GTK_BOX (vbox), self->offsets_col, FALSE, TRUE, 4);
 	gtk_widget_show (self->offsets_col);
 
@@ -197,10 +220,8 @@ g_hex_prefrences_init (GHexPreferences *self)
 	
 	fbox = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, 5);
 	self->font_button = gtk_font_button_new ();
-	font = g_hex_application_get_font_name (app);
-	gtk_font_chooser_set_font (GTK_FONT_CHOOSER (self->font_button), font);
-	g_signal_connect (self->font_button, "font-set",
-	                  G_CALLBACK (select_display_font_cb), self);
+	g_object_bind_property (G_OBJECT (app), "font-name", G_OBJECT (self->font_button),
+							"font", G_BINDING_SYNC_CREATE | G_BINDING_BIDIRECTIONAL);
 	flabel = gtk_label_new ("");
 	gtk_label_set_mnemonic_widget (GTK_LABEL (flabel), self->font_button);
 	gtk_widget_show (flabel);
@@ -262,23 +283,22 @@ g_hex_prefrences_init (GHexPreferences *self)
 	gtk_widget_show (label);
 	gtk_container_add (GTK_CONTAINER (grid), label);
 
-	font = g_hex_application_get_data_font (app);
-	self->df_button = gtk_font_button_new_with_font (font);
-	g_signal_connect (G_OBJECT (self->df_button), "font_set",
-					  G_CALLBACK (select_font_cb), self);
-	self->df_label = gtk_label_new ("");
-	gtk_label_set_mnemonic_widget (GTK_LABEL (self->df_label), self->df_button);
+	df_button = gtk_font_button_new ();
+	g_object_bind_property (G_OBJECT (app), "data-font", G_OBJECT (df_button),
+							"font", G_BINDING_SYNC_CREATE | G_BINDING_BIDIRECTIONAL);
+	df_label = gtk_label_new ("");
+	gtk_label_set_mnemonic_widget (GTK_LABEL (df_label), df_button);
 
-	gtk_label_set_mnemonic_widget (GTK_LABEL (label), self->df_button);
+	gtk_label_set_mnemonic_widget (GTK_LABEL (label), df_button);
 
 	if (gail_up) {
-		add_atk_namedesc (self->df_button, _("Data font"), _("Select the data font"));
-		add_atk_relation (self->df_button, label, ATK_RELATION_LABELLED_BY);
+		add_atk_namedesc (df_button, _("Data font"), _("Select the data font"));
+		add_atk_relation (df_button, label, ATK_RELATION_LABELLED_BY);
 	}	
 	
-	gtk_widget_set_hexpand (self->df_button, TRUE);
-	gtk_widget_show (self->df_button);
-	gtk_grid_attach_next_to (GTK_GRID (grid), self->df_button, label,
+	gtk_widget_set_hexpand (df_button, TRUE);
+	gtk_widget_show (df_button);
+	gtk_grid_attach_next_to (GTK_GRID (grid), df_button, label,
 	                         GTK_POS_RIGHT, 1, 1);
 
 	label = gtk_label_new_with_mnemonic (_("Header fo_nt:"));
@@ -286,23 +306,22 @@ g_hex_prefrences_init (GHexPreferences *self)
 	gtk_label_set_yalign (GTK_LABEL (label), 0.5);
 	gtk_widget_show (label);
 	gtk_container_add (GTK_CONTAINER (grid), label);
-	font = g_hex_application_get_header_font (app);
-	self->hf_button = gtk_font_button_new_with_font (font);
-	g_signal_connect (G_OBJECT (self->hf_button), "font_set",
-					  G_CALLBACK (select_font_cb), self);
-	self->hf_label = gtk_label_new("");
-	gtk_label_set_mnemonic_widget (GTK_LABEL (self->hf_label), self->hf_button);
+	hf_button = gtk_font_button_new ();
+	g_object_bind_property (G_OBJECT (app), "header-font", G_OBJECT (hf_button),
+							"font", G_BINDING_SYNC_CREATE | G_BINDING_BIDIRECTIONAL);
+	hf_label = gtk_label_new ("");
+	gtk_label_set_mnemonic_widget (GTK_LABEL (hf_label), hf_button);
 
-	gtk_label_set_mnemonic_widget (GTK_LABEL (label), self->hf_button);
+	gtk_label_set_mnemonic_widget (GTK_LABEL (label), hf_button);
 
 	if (gail_up) {
-		add_atk_namedesc (self->hf_button, _("Header font"), _("Select the header font"));
-		add_atk_relation (self->hf_button, label, ATK_RELATION_LABELLED_BY);
+		add_atk_namedesc (hf_button, _("Header font"), _("Select the header font"));
+		add_atk_relation (hf_button, label, ATK_RELATION_LABELLED_BY);
 	}
 
-	gtk_widget_set_hexpand (self->hf_button, TRUE);
-	gtk_widget_show(self->hf_button);
-	gtk_grid_attach_next_to (GTK_GRID (grid), self->hf_button, label,
+	gtk_widget_set_hexpand (hf_button, TRUE);
+	gtk_widget_show (hf_button);
+	gtk_grid_attach_next_to (GTK_GRID (grid), hf_button, label,
 	                         GTK_POS_RIGHT, 1, 1);
 
 	label = gtk_label_new ("");
@@ -353,12 +372,36 @@ g_hex_prefrences_init (GHexPreferences *self)
 	for(i = 0; i < 3; i++)
 		g_signal_connect (G_OBJECT (self->group_type[i]), "clicked",
 						  G_CALLBACK(group_type_cb), self);
-	g_signal_connect (G_OBJECT(self->offsets_col), "toggled",
-					  G_CALLBACK(offsets_col_cb), self);
-	g_signal_connect (G_OBJECT(undo_adj), "value_changed",
-					  G_CALLBACK(max_undo_changed_cb), self);
-	g_signal_connect (G_OBJECT(box_adj), "value_changed",
-					  G_CALLBACK(box_size_changed_cb), self);
+
+	g_object_bind_property (G_OBJECT (app), "undo-depth", G_OBJECT (undo_adj),
+						"value", G_BINDING_SYNC_CREATE | G_BINDING_BIDIRECTIONAL);
+	g_object_bind_property (G_OBJECT (app), "shaded-box", G_OBJECT (box_adj),
+						"value", G_BINDING_SYNC_CREATE | G_BINDING_BIDIRECTIONAL);
+
+	/* ======================= */
+	gint             groupid;
+	const gchar     *offset_format;
+
+	groupid = map_group_nick (g_hex_application_get_group_by (app));
+	offset_format = g_hex_application_get_offset_format (app);
+
+	for(gint i = 0; i < 3; i++) {
+		if(groupid == group_type[i]) {
+			gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(self->group_type[i]), TRUE);
+			break;
+		}
+	}
+
+	gtk_widget_set_sensitive(self->format, FALSE);
+	gtk_entry_set_text (GTK_ENTRY (self->format), offset_format);
+	if (strcmp (offset_format, "%d") == 0) {
+		gtk_combo_box_set_active (GTK_COMBO_BOX (self->offset_menu), 0);
+	} else if (strcmp (offset_format, "0x%X") == 0) {
+		gtk_combo_box_set_active (GTK_COMBO_BOX (self->offset_menu), 1);
+	} else {
+		gtk_combo_box_set_active (GTK_COMBO_BOX (self->offset_menu), 2);
+		gtk_widget_set_sensitive (self->format, TRUE);
+	}
 }
 
 GtkWidget *
@@ -370,100 +413,6 @@ g_hex_prefrences_new (GHexWindow *parent)
 						 "transient-for", parent,
 						 "title", _("GHex Preferences"),
 						 NULL);
-}
-
-void set_current_prefs (GHexPreferences *pui) {
-	int i;
-	GHexApplication *app;
-	gint             group;
-	guint            shaded_box;
-	const gchar     *font;
-	gboolean         show_offset;
-	guint            undo_depth;
-	const gchar     *offset_format;
-
-	app = G_HEX_APPLICATION (g_application_get_default ());
-	group = map_group_nick (g_hex_application_get_group_by (app));
-	shaded_box = g_hex_application_get_shaded_box (app);
-	show_offset = g_hex_application_get_show_offset (app);
-	undo_depth = g_hex_application_get_undo_depth (app);
-	offset_format = g_hex_application_get_offset_format (app);
-
-	for(i = 0; i < 3; i++) {
-		if(group == group_type[i]) {
-			gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(pui->group_type[i]), TRUE);
-			break;
-		}
-	}
-	
-	gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON (pui->offsets_col), show_offset);
-	gtk_spin_button_set_value(GTK_SPIN_BUTTON(pui->undo_spin), (gfloat) undo_depth);
-	gtk_spin_button_set_value (GTK_SPIN_BUTTON (pui->box_size_spin), (gfloat) shaded_box);
-
-	gtk_widget_set_sensitive(pui->format, FALSE);
-	gtk_entry_set_text (GTK_ENTRY (pui->format), offset_format);
-	if (strcmp (offset_format, "%d") == 0) {
-		gtk_combo_box_set_active (GTK_COMBO_BOX (pui->offset_menu), 0);
-	} else if (strcmp (offset_format, "0x%X") == 0) {
-		gtk_combo_box_set_active (GTK_COMBO_BOX (pui->offset_menu), 1);
-	} else {
-		gtk_combo_box_set_active (GTK_COMBO_BOX (pui->offset_menu), 2);
-		gtk_widget_set_sensitive (pui->format, TRUE);
-	}
-
-	font = g_hex_application_get_header_font (app);
-	gtk_font_chooser_set_font (GTK_FONT_CHOOSER (pui->hf_button), font);
-
-	font = g_hex_application_get_data_font (app);
-	gtk_font_chooser_set_font (GTK_FONT_CHOOSER (pui->df_button), font);
-
-	font = g_hex_application_get_font_name (app);
-	gtk_font_chooser_set_font (GTK_FONT_CHOOSER (pui->font_button), font);
-
-	gtk_dialog_set_default_response (GTK_DIALOG (pui), GTK_RESPONSE_CLOSE);
-}
-
-static void
-max_undo_changed_cb(GtkAdjustment *adj, GHexPreferences *pui)
-{
-	GHexApplication *app;
-	guint undo_depth;
-
-	app = G_HEX_APPLICATION (g_application_get_default ());
-	undo_depth = g_hex_application_get_undo_depth (app);
-
-	if ((guint) gtk_adjustment_get_value (adj) != undo_depth) {
-		undo_depth = gtk_spin_button_get_value_as_int
-			(GTK_SPIN_BUTTON (pui->undo_spin));
-		g_hex_application_set_undo_depth (app, undo_depth);
-	}
-}
-
-static void
-box_size_changed_cb(GtkAdjustment *adj, GHexPreferences *pui)
-{
-	GHexApplication *app;
-	guint shaded_box;
-
-	app = G_HEX_APPLICATION (g_application_get_default ());
-	shaded_box = g_hex_application_get_shaded_box (app);
-
-	if ((guint) gtk_adjustment_get_value(adj) != shaded_box) {
-		shaded_box = gtk_spin_button_get_value_as_int
-			(GTK_SPIN_BUTTON (pui->box_size_spin));
-		g_hex_application_set_shaded_box (app, shaded_box);
-	}
-}
-
-static void
-offsets_col_cb(GtkToggleButton *tb, GHexPreferences *pui)
-{
-	GHexApplication *app;
-	gboolean show_offsets;
-
-	app = G_HEX_APPLICATION (g_application_get_default ());
-	show_offsets = gtk_toggle_button_get_active (GTK_TOGGLE_BUTTON (pui->offsets_col));
-	g_hex_application_set_show_offset (app, show_offsets);
 }
 
 static void
@@ -484,68 +433,6 @@ group_type_cb(GtkRadioButton *rd, GHexPreferences *pui)
 	}
 
 	g_hex_application_set_group_by (app, map_nick_group (group));
-}
-
-static void
-prefs_response_cb(GHexPreferences *self, gint response, gpointer data)
-{
-	GError *error = NULL;
-
-	switch(response) {
-	case GTK_RESPONSE_HELP:
-		gtk_show_uri_on_window (GTK_WINDOW (self), "help:ghex/ghex-prefs", GDK_CURRENT_TIME, &error);
-		if(NULL != error) {
-			GtkWidget *dialog;
-			dialog = gtk_message_dialog_new
-				(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_CLOSE,
-				 _("There was an error displaying help: \n%s"),
-				 error->message);
-			g_signal_connect (G_OBJECT (dialog), "response",
-							  G_CALLBACK (gtk_widget_destroy),
-							  NULL);
-			gtk_window_set_resizable (GTK_WINDOW (dialog), FALSE);
-			gtk_window_present (GTK_WINDOW (dialog));
-
-			g_error_free(error);
-		}
-		break;
-	default:
-		gtk_widget_destroy (GTK_WIDGET (self));
-		break;
-	}
-}
-
-static void
-select_display_font_cb(GtkWidget *w, GHexPreferences *pui)
-{
-	GHexApplication *app;
-	const gchar *font;
-
-	app = G_HEX_APPLICATION (g_application_get_default ());
-	font = g_hex_application_get_font_name (app);
-
-	if (strcmp (gtk_font_chooser_get_font (GTK_FONT_CHOOSER (pui->font_button)), font) != 0) {
-		font = gtk_font_chooser_get_font (GTK_FONT_CHOOSER (pui->font_button));
-		g_hex_application_set_font_name (app, font);
-	}
-}
-
-static void
-select_font_cb(GtkWidget *w, GHexPreferences *pui)
-{
-	GHexApplication *app;
-	const gchar *font;
-
-	app = G_HEX_APPLICATION (g_application_get_default ());
-
-	if(w == pui->df_button) {
-		font = gtk_font_chooser_get_font (GTK_FONT_CHOOSER (pui->df_button));
-		g_hex_application_set_data_font (app, font);
-	}
-	else if(w == pui->hf_button) {
-		font = gtk_font_chooser_get_font (GTK_FONT_CHOOSER (pui->hf_button));
-		g_hex_application_set_header_font (app, font);
-	}
 }
 
 static void
