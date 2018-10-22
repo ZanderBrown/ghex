@@ -138,6 +138,7 @@ static void create_dialog_prop(HexDialogEntryTypes type,
     GtkWidget *label;
 
     label = gtk_label_new(_(HexDialogEntries[type].name));
+    gtk_style_context_add_class (gtk_widget_get_style_context (label), GTK_STYLE_CLASS_DIM_LABEL);
     gtk_label_set_xalign (GTK_LABEL (label), 1.0);
     gtk_label_set_yalign (GTK_LABEL (label), 0.5);
     gtk_widget_set_hexpand (label, TRUE);
@@ -145,12 +146,15 @@ static void create_dialog_prop(HexDialogEntryTypes type,
                      xpos, ypos, 1, 1);
     gtk_widget_show(label);
 
-    dialog->entry[type] = gtk_entry_new();
-    gtk_editable_set_editable(GTK_EDITABLE(dialog->entry[type]), FALSE);
-    gtk_widget_set_hexpand (dialog->entry[type], TRUE);
+    dialog->entry[type] = g_object_new (GTK_TYPE_LABEL,
+                                        "selectable", TRUE,
+                                        "halign", GTK_ALIGN_START,
+                                        "hexpand", TRUE,
+                                        "visible", TRUE,
+                                        NULL);
+    gtk_style_context_add_class (gtk_widget_get_style_context (dialog->entry[type]), GTK_STYLE_CLASS_MONOSPACE);
     gtk_grid_attach (GTK_GRID (grid), dialog->entry[type],
                      xpos+1, ypos, 1, 1);
-    gtk_widget_show(dialog->entry[type]);
 }
 
 static void config_toggled_cb(GtkToggleButton *togglebutton, gpointer user_data)
@@ -259,7 +263,7 @@ static void update_dialog_prop(HexDialogEntryTypes type,
 {
     char *buf;
     buf = dialog_prop_get_text (type, dialog, val);
-    gtk_entry_set_text (GTK_ENTRY (dialog->entry[type]), buf);
+    gtk_label_set_text (GTK_LABEL (dialog->entry[type]), buf);
 }
 
 /* Try to guess the maximum width needed for each entry */
@@ -275,7 +279,7 @@ void hex_dialog_update_entry_sizes(HexDialog *dialog)
     for (i = 0; i < ENTRY_MAX; i++)
     {
         width_chars = strlen (dialog_prop_get_text (i, dialog, &val));
-        gtk_entry_set_width_chars (GTK_ENTRY (dialog->entry[i]), width_chars);
+        gtk_label_set_width_chars (GTK_LABEL (dialog->entry[i]), width_chars);
     }
 }
 
