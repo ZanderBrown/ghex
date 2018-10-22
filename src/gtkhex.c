@@ -124,6 +124,16 @@ struct _GtkHexPrivate
 };
 
 G_DEFINE_TYPE_WITH_PRIVATE (GtkHex, gtk_hex, GTK_TYPE_FIXED)
+
+enum {
+	PROP_0,
+	PROP_DOCUMENT,
+	LAST_PROP
+};
+
+static GParamSpec *pspecs[LAST_PROP] = { NULL, };
+
+
 static gint gtkhex_signals[LAST_SIGNAL] = { 0 };
 
 static gchar *char_widths = NULL;
@@ -2150,21 +2160,71 @@ gtk_hex_get_preferred_height (GtkWidget *widget,
 }
 
 static void
-gtk_hex_class_init(GtkHexClass *klass)
+gtk_hex_set_property (GObject      *object,
+                      guint         property_id,
+                      const GValue *value,
+                      GParamSpec   *pspec)
 {
-	GObjectClass *object_class = G_OBJECT_CLASS (klass);
+	GtkHex *data = GTK_HEX (object);
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (data);
+
+	switch (property_id) {
+		case PROP_DOCUMENT:
+			priv->document = g_value_get_object (value);
+			g_signal_connect (G_OBJECT (priv->document), "document_changed",
+							  G_CALLBACK (gtk_hex_document_changed), data);
+			break;
+		default:
+			G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
+			break;
+	}
+}
+
+static void
+gtk_hex_get_property (GObject    *object,
+                      guint       property_id,
+                      GValue     *value,
+                      GParamSpec *pspec)
+{
+	GtkHex *data = GTK_HEX (object);
+
+	switch (property_id) {
+		case PROP_DOCUMENT:
+			g_value_set_object (value, gtk_hex_get_document (data));
+			break;
+		default:
+			G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
+			break;
+	}
+}
+
+
+static void
+gtk_hex_class_init (GtkHexClass *klass)
+{
+	GObjectClass   *object_class = G_OBJECT_CLASS (klass);
 	GtkWidgetClass *widget_class = GTK_WIDGET_CLASS (klass);
+
+	object_class->set_property = gtk_hex_set_property;
+	object_class->get_property = gtk_hex_get_property;
+	object_class->finalize = gtk_hex_finalize;
+
+	pspecs[PROP_DOCUMENT] =
+		g_param_spec_object ("document", "Document", NULL, HEX_DOCUMENT_TYPE,
+							 G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
+
+	g_object_class_install_properties (object_class, LAST_PROP, pspecs);
 
 	gtkhex_signals[CURSOR_MOVED_SIGNAL] =
 		g_signal_new ("cursor_moved",
-					  G_TYPE_FROM_CLASS (widget_class),
+					  G_OBJECT_CLASS_TYPE (object_class),
 					  G_SIGNAL_RUN_FIRST,
 					  G_STRUCT_OFFSET (GtkHexClass, cursor_moved),
 					  NULL, NULL, NULL, G_TYPE_NONE, 0);
 
 	gtkhex_signals[DATA_CHANGED_SIGNAL] = 
 		g_signal_new ("data_changed",
-					  G_TYPE_FROM_CLASS (widget_class),
+					  G_OBJECT_CLASS_TYPE (object_class),
 					  G_SIGNAL_RUN_FIRST,
 					  G_STRUCT_OFFSET (GtkHexClass, data_changed),
 					  NULL, NULL, NULL, G_TYPE_NONE, 1,
@@ -2172,14 +2232,14 @@ gtk_hex_class_init(GtkHexClass *klass)
 
 	gtkhex_signals[CUT_CLIPBOARD_SIGNAL] = 
 		g_signal_new ("cut_clipboard",
-					  G_TYPE_FROM_CLASS (widget_class),
+					  G_OBJECT_CLASS_TYPE (object_class),
 					  G_SIGNAL_RUN_FIRST,
 					  G_STRUCT_OFFSET (GtkHexClass, cut_clipboard),
 					  NULL, NULL, NULL, G_TYPE_NONE, 0);
 
 	gtkhex_signals[COPY_CLIPBOARD_SIGNAL] = 
 		g_signal_new ("copy_clipboard",
-					  G_TYPE_FROM_CLASS (widget_class),
+					  G_OBJECT_CLASS_TYPE (object_class),
 					  G_SIGNAL_RUN_FIRST,
 					  G_STRUCT_OFFSET (GtkHexClass, copy_clipboard),
 					  NULL, NULL, NULL, G_TYPE_NONE, 0);
@@ -2187,7 +2247,7 @@ gtk_hex_class_init(GtkHexClass *klass)
 
 	gtkhex_signals[PASTE_CLIPBOARD_SIGNAL] = 
 		g_signal_new ("paste_clipboard",
-					  G_TYPE_FROM_CLASS (widget_class),
+					  G_OBJECT_CLASS_TYPE (object_class),
 					  G_SIGNAL_RUN_FIRST,
 					  G_STRUCT_OFFSET (GtkHexClass, paste_clipboard),
 					  NULL, NULL, NULL, G_TYPE_NONE, 0);
@@ -2201,17 +2261,15 @@ gtk_hex_class_init(GtkHexClass *klass)
 	klass->primary = gtk_clipboard_get(GDK_SELECTION_PRIMARY);
 	klass->clipboard = gtk_clipboard_get(GDK_NONE);
 
-	GTK_WIDGET_CLASS(klass)->size_allocate = gtk_hex_size_allocate;
-	GTK_WIDGET_CLASS(klass)->get_preferred_width = gtk_hex_get_preferred_width;
-	GTK_WIDGET_CLASS(klass)->get_preferred_height = gtk_hex_get_preferred_height;
-	GTK_WIDGET_CLASS(klass)->draw = gtk_hex_draw;
-	GTK_WIDGET_CLASS(klass)->key_press_event = gtk_hex_key_press;
-	GTK_WIDGET_CLASS(klass)->key_release_event = gtk_hex_key_release;
-	GTK_WIDGET_CLASS(klass)->button_release_event = gtk_hex_button_release;
+	widget_class->size_allocate = gtk_hex_size_allocate;
+	widget_class->get_preferred_width = gtk_hex_get_preferred_width;
+	widget_class->get_preferred_height = gtk_hex_get_preferred_height;
+	widget_class->draw = gtk_hex_draw;
+	widget_class->key_press_event = gtk_hex_key_press;
+	widget_class->key_release_event = gtk_hex_key_release;
+	widget_class->button_release_event = gtk_hex_button_release;
 
-	gtk_widget_class_set_css_name (GTK_WIDGET_CLASS(klass), "hex-editor");
-
-	object_class->finalize = gtk_hex_finalize;
+	gtk_widget_class_set_css_name (widget_class, "hex-editor");
 }
 
 static void
@@ -2338,18 +2396,12 @@ gtk_hex_init (GtkHex *gh)
 	gtk_widget_show(priv->scrollbar);
 }
 
-GtkWidget *gtk_hex_new(HexDocument *owner) {
-	GtkHex *gh;
-
-	gh = GTK_HEX (g_object_new (GTK_TYPE_HEX, NULL));
-	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
-	g_return_val_if_fail (gh != NULL, NULL);
-
-	priv->document = owner;
-    g_signal_connect (G_OBJECT (priv->document), "document_changed",
-            G_CALLBACK (gtk_hex_document_changed), gh);
-	
-	return GTK_WIDGET(gh);
+GtkWidget *
+gtk_hex_new (HexDocument *owner)
+{
+	return g_object_new (GTK_TYPE_HEX,
+						 "document", owner,
+						 NULL);
 }
 
 
