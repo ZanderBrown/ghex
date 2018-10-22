@@ -31,19 +31,14 @@
 
 G_BEGIN_DECLS
 
-#define HEX_DOCUMENT_TYPE          (hex_document_get_type())
-#define HEX_DOCUMENT(obj)          G_TYPE_CHECK_INSTANCE_CAST (obj, hex_document_get_type (), HexDocument)
-#define HEX_DOCUMENT_CLASS(klass)  G_TYPE_CHECK_CLASS_CAST (klass, hex_document_get_type (), HexDocumentClass)
-#define IS_HEX_DOCUMENT(obj)       G_TYPE_CHECK_INSTANCE_TYPE (obj, hex_document_get_type ())
-
-typedef struct _HexDocument       HexDocument;
-typedef struct _HexDocumentClass  HexDocumentClass;
 typedef struct _HexChangeData     HexChangeData;
 
 typedef enum {
 	HEX_CHANGE_STRING,
 	HEX_CHANGE_BYTE
 } HexChangeType;
+
+#define HEX_TYPE_CHANGE_DATA (hex_change_data_get_type ())
 
 struct _HexChangeData
 {
@@ -55,28 +50,8 @@ struct _HexChangeData
 	gchar v_byte;
 };
 
-struct _HexDocument
-{
-	GObject object;
-
-	GList *views;      /* a list of GtkHex widgets showing this document */
-	
-	gchar *file_name;
-	gchar *path_end;
-
-	guchar *buffer;    /* data buffer */
-	guchar *gap_pos;   /* pointer to the start of insertion gap */
-	gint gap_size;     /* insertion gap size */
-	guint buffer_size; /* buffer size = file size + gap size */
-	guint file_size;   /* real file size */
-
-	gboolean changed;
-
-	GList *undo_stack; /* stack base */
-	GList *undo_top;   /* top of the stack (for redo) */
-	guint undo_depth;  /* number of els on stack */
-	guint undo_max;    /* max undo depth */
-};
+#define HEX_TYPE_DOCUMENT (hex_document_get_type ())
+G_DECLARE_DERIVABLE_TYPE (HexDocument, hex_document, HEX, DOCUMENT, GObject)
 
 struct _HexDocumentClass
 {
@@ -88,7 +63,6 @@ struct _HexDocumentClass
 	void (*undo_stack_forget)(HexDocument *);
 };
 
-GType       hex_document_get_type(void);
 HexDocument *hex_document_new(void);
 HexDocument *hex_document_new_from_file(const gchar *name);
 void        hex_document_set_data(HexDocument *doc, guint offset,
@@ -126,6 +100,30 @@ void        hex_document_remove_view(HexDocument *doc, GtkWidget *view);
 GtkWidget   *hex_document_add_view(HexDocument *doc);
 const GList *hex_document_get_list(void);
 gboolean    hex_document_is_writable(HexDocument *doc);
+
+guint
+hex_document_get_file_size   (HexDocument *self);
+const gchar *
+hex_document_get_file_name   (HexDocument *self);
+void
+hex_document_set_file_name   (HexDocument *self,
+                              const gchar *file);
+const gchar *
+hex_document_get_path_end    (HexDocument *self);
+void
+hex_document_set_path_end    (HexDocument *self,
+                              const gchar *path_end);
+void
+hex_document_set_changed     (HexDocument *self,
+                              gboolean     changed);
+gboolean
+hex_document_get_can_undo    (HexDocument *self);
+gboolean
+hex_document_get_can_redo    (HexDocument *self);
+GList *
+hex_document_get_views       (HexDocument *self);
+HexChangeData *
+hex_document_get_last_change (HexDocument *self);
 
 G_END_DECLS
 

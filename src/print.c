@@ -52,7 +52,7 @@ static void print_header(GHexPrintJobInfo *pji, unsigned int page)
 {
 	PangoLayout *layout;
 	cairo_t *cr = gtk_print_context_get_cairo_context (pji->pc);
-	gchar *text1 = g_filename_to_utf8 (pji->doc->file_name, -1, NULL,
+	gchar *text1 = g_filename_to_utf8 (hex_document_get_file_name (pji->doc), -1, NULL,
 									   NULL, NULL);
 	gchar *text2 = g_strdup_printf (_("Page: %i/%i"), page, pji->pages);
 	gchar *pagetext = g_strdup_printf ("%d", page);
@@ -318,7 +318,7 @@ begin_print (GtkPrintOperation *operation,
     pji->bytes_per_row *= pji->gt;
     pji->rows_per_page = (printable_height - pji->header_height) /
                           pji->font_char_height - 2;
-    pji->pages = (((pji->doc->file_size/pji->bytes_per_row) + 1)/
+    pji->pages = (((hex_document_get_file_size (pji->doc) / pji->bytes_per_row) + 1)/
                    pji->rows_per_page) + 1;
     gtk_print_operation_set_n_pages (pji->master, pji->pages);
 }
@@ -339,8 +339,8 @@ print_page (GtkPrintOperation *operation,
 
 	print_header (pji, page_nr+1);
 	max_row = (pji->bytes_per_row*pji->rows_per_page*(page_nr+1) >
-			pji->doc->file_size ?
-			(int)((pji->doc->file_size-1)-
+			hex_document_get_file_size (pji->doc) ?
+			(int)((hex_document_get_file_size (pji->doc) - 1) -
 			      (pji->bytes_per_row *
 			       pji->rows_per_page*(page_nr))) /
 			       pji->bytes_per_row + 1:
@@ -350,10 +350,10 @@ print_page (GtkPrintOperation *operation,
 		int file_offset = pji->bytes_per_row*(j - 1) +
 			pji->bytes_per_row*pji->rows_per_page*(page_nr);
 		int length = (file_offset + pji->bytes_per_row >
-			pji->doc->file_size ?
-			pji->doc->file_size - file_offset :
+			hex_document_get_file_size (pji->doc) ?
+			hex_document_get_file_size (pji->doc) - file_offset :
 			pji->bytes_per_row);
-		if (file_offset >= pji->doc->file_size)
+		if (file_offset >= hex_document_get_file_size (pji->doc))
 			break;
 		print_row (pji, file_offset, length, j);
 	}

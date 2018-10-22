@@ -91,7 +91,7 @@ g_hex_replace_response (GHexReplace *self, gint res, gpointer data)
 
 		rep_len = get_search_string (self->r_doc, &rep_str);
 
-		if (str_len > doc->file_size - gtk_hex_get_cursor_pos (gh))
+		if (str_len > hex_document_get_file_size (doc) - gtk_hex_get_cursor_pos (gh))
 			goto clean_up;
 
 		if (hex_document_compare_data (doc, (guchar *) str, gtk_hex_get_cursor_pos (gh), str_len) == 0)
@@ -112,7 +112,7 @@ g_hex_replace_response (GHexReplace *self, gint res, gpointer data)
 
 		rep_len = get_search_string (self->r_doc, &rep_str);
 
-		if(str_len > doc->file_size - gtk_hex_get_cursor_pos (gh))
+		if(str_len > hex_document_get_file_size (doc) - gtk_hex_get_cursor_pos (gh))
 			goto clean_up;
 
 		count = 0;
@@ -125,7 +125,7 @@ g_hex_replace_response (GHexReplace *self, gint res, gpointer data)
 			count++;
 		}
 
-		gtk_hex_set_cursor (gh, MIN(offset, doc->file_size));
+		gtk_hex_set_cursor (gh, MIN(offset, hex_document_get_file_size (doc)));
 
 		if(count == 0) {
 			display_info_dialog (GTK_WINDOW (win), _("No occurrences were found."));

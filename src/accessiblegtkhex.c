@@ -285,14 +285,14 @@ accessible_gtk_hex_get_text (AtkText *text,
 
 	if (gtk_hex_get_active_view (gtk_hex) == VIEW_ASCII)
 	{
-		str = g_malloc (gtk_hex_get_document (gtk_hex)->file_size);
-		format_ablock (gtk_hex, str, 0, gtk_hex_get_document (gtk_hex)->file_size);
+		str = g_malloc (hex_document_get_file_size (gtk_hex_get_document (gtk_hex)));
+		format_ablock (gtk_hex, str, 0, hex_document_get_file_size (gtk_hex_get_document (gtk_hex)));
 	}
 
 	if (gtk_hex_get_active_view (gtk_hex) == VIEW_HEX)
 	{
-		str = g_malloc (gtk_hex_get_document (gtk_hex)->file_size*3);
-		format_xblock (gtk_hex, str, 0,gtk_hex_get_document (gtk_hex)->file_size);
+		str = g_malloc (hex_document_get_file_size (gtk_hex_get_document (gtk_hex)) * 3);
+		format_xblock (gtk_hex, str, 0, hex_document_get_file_size (gtk_hex_get_document (gtk_hex)));
 	}
 
 	utf8 = g_locale_to_utf8 (str, -1, NULL, NULL, NULL);
@@ -358,7 +358,7 @@ accessible_gtk_hex_get_character_count (AtkText *text)
 	
 	gtk_hex = GTK_HEX (widget);
 
-	return gtk_hex_get_document (gtk_hex)->file_size;
+	return hex_document_get_file_size (gtk_hex_get_document (gtk_hex));
 }
 
 static gunichar
@@ -423,7 +423,7 @@ accessible_gtk_hex_set_text_contents (AtkEditableText *text,
 
 	len = g_utf8_strlen (string, -1);
 
-	hex_document_delete_data (gtk_hex_get_document (gtkhex), 0, gtk_hex_get_document (gtkhex)->file_size, FALSE);
+	hex_document_delete_data (gtk_hex_get_document (gtkhex), 0, hex_document_get_file_size (gtk_hex_get_document (gtkhex)), FALSE);
 	hex_document_set_data (gtk_hex_get_document (gtkhex), 0, len, 0, (guchar *)string, TRUE);
 }
 
@@ -480,14 +480,14 @@ _accessible_gtk_hex_changed_cb (GtkHex *gtkhex)
 
 	if (gtk_hex_get_active_view (gtkhex) == VIEW_ASCII)
 	{
-		str = g_malloc (gtk_hex_get_document (gtkhex)->file_size);
-		format_ablock (gtkhex, str, 0, gtk_hex_get_document (gtkhex)->file_size);
+		str = g_malloc (hex_document_get_file_size (gtk_hex_get_document (gtkhex)));
+		format_ablock (gtkhex, str, 0, hex_document_get_file_size (gtk_hex_get_document (gtkhex)));
 	}
 
 	if (gtk_hex_get_active_view (gtkhex) == VIEW_HEX)
 	{
-		str = g_malloc (gtk_hex_get_document (gtkhex)->file_size*3);
-		format_xblock (gtkhex, str, 0, gtk_hex_get_document (gtkhex)->file_size);
+		str = g_malloc (hex_document_get_file_size (gtk_hex_get_document (gtkhex)) * 3);
+		format_xblock (gtkhex, str, 0, hex_document_get_file_size (gtk_hex_get_document (gtkhex)));
 	}
 
 	utf8 = g_locale_to_utf8 (str, -1, NULL, NULL, NULL);

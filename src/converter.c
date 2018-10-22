@@ -268,7 +268,7 @@ g_hex_converter_response (GtkDialog *self,
 				val |= gtk_hex_get_byte (GTK_HEX (view), start);
 				start++;
 			} while ((start % gtk_hex_get_group_type (GTK_HEX (view)) != 0) &&
-					 (start < gtk_hex_get_document (GTK_HEX (view))->file_size) );
+					 (start < hex_document_get_file_size (gtk_hex_get_document (GTK_HEX (view)))));
 
 			g_hex_converter_update_values (G_HEX_CONVERTER (self), val);
 		}

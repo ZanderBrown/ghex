@@ -113,7 +113,7 @@ g_hex_goto_response (GHexGoto *self, gint res, gpointer data)
 				}
 				byte = byte * is_relative + gtk_hex_get_cursor_pos (win->gh);
 			}
-			if(byte >= gtk_hex_get_document (win->gh)->file_size)
+			if (byte >= hex_document_get_file_size (gtk_hex_get_document (win->gh)))
 				display_error_dialog (GTK_WIDGET (win),
 									  _("Can not position cursor beyond the "
 									    "End Of File!"));

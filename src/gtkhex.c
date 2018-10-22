@@ -772,7 +772,7 @@ render_hex_lines (GtkHex *gh,
 	gdk_cairo_set_source_rgba (cr, &fg_color);
 
 	frm_len = format_xblock (gh, (gchar *) priv->disp_buffer, (priv->top_line+imin)*priv->cpl,
-							MIN((priv->top_line+imax+1)*priv->cpl, priv->document->file_size) );
+							MIN((priv->top_line+imax+1)*priv->cpl, hex_document_get_file_size (priv->document)));
 	
 	for(i = imin; i <= imax; i++) {
 		tmp = (gint)frm_len - (gint)((i - imin)*xcpl);
@@ -826,7 +826,7 @@ render_ascii_lines (GtkHex *gh,
 	gdk_cairo_set_source_rgba (cr, &fg_color);
 	
 	frm_len = format_ablock (gh, (gchar *) priv->disp_buffer, (priv->top_line+imin)*priv->cpl,
-							MIN((priv->top_line+imax+1)*priv->cpl, priv->document->file_size) );
+							MIN((priv->top_line+imax+1)*priv->cpl, hex_document_get_file_size (priv->document)) );
 	
 	for(i = imin; i <= imax; i++) {
 		tmp = (gint)frm_len - (gint)((i - imin)*priv->cpl);
@@ -1064,11 +1064,11 @@ static void recalc_displays(GtkHex *gh, guint width, guint height) {
 	if(priv->cpl == 0)
 		return;
 
-	if(priv->document->file_size == 0)
+	if(hex_document_get_file_size (priv->document) == 0)
 		priv->lines = 1;
 	else {
-		priv->lines = priv->document->file_size / priv->cpl;
-		if(priv->document->file_size % priv->cpl)
+		priv->lines = hex_document_get_file_size (priv->document) / priv->cpl;
+		if(hex_document_get_file_size (priv->document) % priv->cpl)
 			priv->lines++;
 	}
 
@@ -1145,7 +1145,7 @@ static gboolean scroll_timeout_handler(GtkHex *gh) {
 	if(priv->scroll_dir < 0)
 		gtk_hex_set_cursor(gh, MAX(0, (int)(priv->cursor_pos - priv->cpl)));
 	else if(priv->scroll_dir > 0)
-		gtk_hex_set_cursor(gh, MIN(priv->document->file_size - 1,
+		gtk_hex_set_cursor(gh, MIN(hex_document_get_file_size (priv->document) - 1,
 								   priv->cursor_pos + priv->cpl));
 	return TRUE;
 }
@@ -1394,8 +1394,8 @@ static void gtk_hex_real_data_changed(GtkHex *gh, gpointer data) {
 		return;
 
 	if(change_data->start - change_data->end + 1 != change_data->rep_len) {
-		lines = priv->document->file_size / priv->cpl;
-		if(priv->document->file_size % priv->cpl)
+		lines = hex_document_get_file_size (priv->document) / priv->cpl;
+		if(hex_document_get_file_size (priv->document) % priv->cpl)
 			lines++;
 		if(lines != priv->lines) {
 			priv->lines = lines;
@@ -1484,7 +1484,7 @@ static void primary_clear_cb(GtkClipboard *clipboard,
 void gtk_hex_set_selection(GtkHex *gh, gint start, gint end)
 {
 	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
-	gint length = priv->document->file_size;
+	gint length = hex_document_get_file_size (priv->document);
 	gint oe, os, ne, ns;
 	GtkHexClass *klass = GTK_HEX_CLASS(GTK_WIDGET_GET_CLASS(gh));
 
@@ -1610,7 +1610,7 @@ static GtkHex_Highlight *gtk_hex_insert_highlight (GtkHex *gh,
 {
 	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
 	GdkRGBA rgba;
-	gint length = priv->document->file_size;
+	gint length = hex_document_get_file_size (priv->document);
 
 	GtkHex_Highlight *new = g_malloc0(sizeof(GtkHex_Highlight));
 
@@ -1877,7 +1877,7 @@ static gboolean gtk_hex_key_press(GtkWidget *w, GdkEventKey *event) {
 		}
 		break;
 	case GDK_KEY_Delete:
-		if(priv->cursor_pos < priv->document->file_size) {
+		if(priv->cursor_pos < hex_document_get_file_size (priv->document)) {
 			hex_document_set_data(priv->document, priv->cursor_pos,
 								  0, 1, NULL, TRUE);
 			gtk_hex_set_cursor(gh, priv->cursor_pos);
@@ -1893,7 +1893,7 @@ static gboolean gtk_hex_key_press(GtkWidget *w, GdkEventKey *event) {
 		gtk_hex_set_cursor(gh, MAX(0, (gint)priv->cursor_pos - priv->vis_lines*priv->cpl));
 		break;
 	case GDK_KEY_Page_Down:
-		gtk_hex_set_cursor(gh, MIN((gint)priv->document->file_size, (gint)priv->cursor_pos + priv->vis_lines*priv->cpl));
+		gtk_hex_set_cursor(gh, MIN((gint)hex_document_get_file_size (priv->document), (gint)priv->cursor_pos + priv->vis_lines*priv->cpl));
 		break;
 	default:
 		if (event->state & GDK_MOD1_MASK) {
@@ -1913,7 +1913,7 @@ static gboolean gtk_hex_key_press(GtkWidget *w, GdkEventKey *event) {
 				}
 				break;
 			case GDK_KEY_Right:
-				if(priv->cursor_pos >= priv->document->file_size)
+				if(priv->cursor_pos >= hex_document_get_file_size (priv->document))
 					break;
 				if(!(event->state & GDK_SHIFT_MASK)) {
 					priv->lower_nibble = !priv->lower_nibble;
@@ -2210,7 +2210,7 @@ gtk_hex_class_init (GtkHexClass *klass)
 	object_class->finalize = gtk_hex_finalize;
 
 	pspecs[PROP_DOCUMENT] =
-		g_param_spec_object ("document", "Document", NULL, HEX_DOCUMENT_TYPE,
+		g_param_spec_object ("document", "Document", NULL, HEX_TYPE_DOCUMENT,
 							 G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
 
 	g_object_class_install_properties (object_class, LAST_PROP, pspecs);
@@ -2445,8 +2445,8 @@ void gtk_hex_set_cursor(GtkHex *gh, gint index) {
 	g_return_if_fail(gh != NULL);
 	g_return_if_fail(GTK_IS_HEX(gh));
 
-	if((index >= 0) && (index <= priv->document->file_size)) {
-		if(!priv->insert && index == priv->document->file_size)
+	if((index >= 0) && (index <= hex_document_get_file_size (priv->document))) {
+		if(!priv->insert && index == hex_document_get_file_size (priv->document))
 			index--;
 
 		index = MAX(index, 0);
@@ -2469,7 +2469,7 @@ void gtk_hex_set_cursor(GtkHex *gh, gint index) {
 			g_signal_emit_by_name(G_OBJECT(priv->adj), "value_changed");
 		}      
 
-		if(index == priv->document->file_size)
+		if(index == hex_document_get_file_size (priv->document))
 			priv->lower_nibble = FALSE;
 		
 		if(priv->selecting) {
@@ -2504,8 +2504,8 @@ void gtk_hex_set_cursor_xy(GtkHex *gh, gint x, gint y) {
 	cp = y*priv->cpl + x;
 
 	if((y >= 0) && (y < priv->lines) && (x >= 0) &&
-	   (x < priv->cpl) && (cp <= priv->document->file_size)) {
-		if(!priv->insert && cp == priv->document->file_size)
+	   (x < priv->cpl) && (cp <= hex_document_get_file_size (priv->document))) {
+		if(!priv->insert && cp == hex_document_get_file_size (priv->document))
 			cp--;
 
 		cp = MAX(cp, 0);
@@ -2562,7 +2562,7 @@ guchar gtk_hex_get_byte(GtkHex *gh, guint offset) {
 
 	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
 
-	if((offset >= 0) && (offset < priv->document->file_size))
+	if((offset >= 0) && (offset < hex_document_get_file_size (priv->document)))
 		return hex_document_get_byte(priv->document, offset);
 
 	return 0;
@@ -2663,8 +2663,8 @@ void gtk_hex_set_insert_mode(GtkHex *gh, gboolean insert)
 	priv->insert = insert;
 
 	if(!priv->insert && priv->cursor_pos > 0) {
-		if(priv->cursor_pos >= priv->document->file_size)
-			priv->cursor_pos = priv->document->file_size - 1;
+		if(priv->cursor_pos >= hex_document_get_file_size (priv->document))
+			priv->cursor_pos = hex_document_get_file_size (priv->document) - 1;
 	}
 }
 

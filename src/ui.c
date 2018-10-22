@@ -245,7 +245,7 @@ save_cb (GSimpleAction *action,
 		gchar *flash;
 		gchar *gtk_file_name;
 
-		gtk_file_name = g_filename_to_utf8 (doc->file_name, -1,
+		gtk_file_name = g_filename_to_utf8 (hex_document_get_file_name (doc), -1,
 											NULL, NULL, NULL);
 		flash = g_strdup_printf(_("Saved buffer to file %s"), gtk_file_name);
 
@@ -297,7 +297,7 @@ open_cb (GSimpleAction *action,
 		if (win) {
 			gchar *gtk_file_name;
 			gtk_file_name = g_filename_to_utf8
-				(gtk_hex_get_document (GHEX_WINDOW (win)->gh)->file_name, -1,
+				(hex_document_get_file_name (gtk_hex_get_document (GHEX_WINDOW (win)->gh)), -1,
 				 NULL, NULL, NULL);
 			flash = g_strdup_printf (_("Loaded file %s"), gtk_file_name);
 			ghex_window_flash (GHEX_WINDOW (win), flash);
@@ -384,7 +384,7 @@ export_html_cb (GSimpleAction *action,
 										   _("Save"), GTK_RESPONSE_OK,
 										   NULL);
 #if 0
-	gtk_file_chooser_set_filename(GTK_FILE_CHOOSER(file_sel), doc->file_name);
+	gtk_file_chooser_set_filename(GTK_FILE_CHOOSER(file_sel), hex_document_get_file_name (doc));
 #endif
 	gtk_window_set_modal(GTK_WINDOW(file_sel), TRUE);
 	gtk_window_set_position(GTK_WINDOW (file_sel), GTK_WIN_POS_MOUSE);
@@ -455,7 +455,8 @@ export_html_cb (GSimpleAction *action,
 		}
 		g_free(check_path);
 
-		hex_document_export_html(doc, html_path, base_name, 0, doc->file_size,
+		hex_document_export_html(doc, html_path, base_name, 0,
+								 hex_document_get_file_size (doc),
 								 gtk_hex_get_cpl (view),
 								 gtk_hex_get_visible_lines (view),
 								 gtk_hex_get_group_type (view));
@@ -681,14 +682,14 @@ revert_cb (GSimpleAction *action,
 	if(doc == NULL)
 		return;
 
-	if(doc->changed) {
+	if (hex_document_has_changed (doc)) {
 		mbox = gtk_message_dialog_new(GTK_WINDOW(win),
 									  GTK_DIALOG_MODAL|
 									  GTK_DIALOG_DESTROY_WITH_PARENT,
 									  GTK_MESSAGE_QUESTION,
 									  GTK_BUTTONS_YES_NO,
 									  _("Really revert file %s?"),
-									  doc->path_end);
+									  hex_document_get_path_end (doc));
 		gtk_dialog_set_default_response(GTK_DIALOG(mbox), GTK_RESPONSE_NO);
 
 		reply = ask_user(GTK_MESSAGE_DIALOG(mbox));
@@ -697,7 +698,7 @@ revert_cb (GSimpleAction *action,
 			gchar *flash;
 			gchar *gtk_file_name;
 
-			gtk_file_name = g_filename_to_utf8 (doc->file_name, -1,
+			gtk_file_name = g_filename_to_utf8 (hex_document_get_file_name (doc), -1,
 												NULL, NULL, NULL);
 			win->changed = FALSE;
 			hex_document_read(doc);
@@ -731,7 +732,7 @@ ghex_print(GtkHex *gh, gboolean preview)
 
 	doc = gtk_hex_get_document (gh);
 
-	gtk_file_name = g_filename_to_utf8 (doc->file_name, -1, NULL, NULL, NULL);
+	gtk_file_name = g_filename_to_utf8 (hex_document_get_file_name (doc), -1, NULL, NULL, NULL);
 	basename = g_filename_display_basename (gtk_file_name);
 
 	pji = ghex_print_job_info_new(doc, gtk_hex_get_group_type (gh));
@@ -856,7 +857,7 @@ GtkWidget *create_hex_view(HexDocument *doc)
 
 gint get_search_string(HexDocument *doc, gchar **str)
 {
-	guint size = doc->file_size;
+	guint size = hex_document_get_file_size (doc);
 
 	if(size > 0)
 		*str = (gchar *)hex_document_get_data(doc, 0, size);

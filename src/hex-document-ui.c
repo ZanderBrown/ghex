@@ -43,20 +43,20 @@ set_doc_menu_sensitivity(HexDocument *doc)
 	GHexWindow *win;
 	GAction *act;
 
-	view_node = doc->views;
+	view_node = hex_document_get_views (doc);
 
 	while (view_node) {
-		view = GTK_WIDGET(view_node->data);
+		view = GTK_WIDGET (view_node->data);
 
-		win = GHEX_WINDOW(gtk_widget_get_toplevel(view));
+		win = GHEX_WINDOW (gtk_widget_get_toplevel(view));
 
 		g_return_if_fail (win != NULL);
  
-		sensitive = doc->undo_top != NULL;
+		sensitive = hex_document_get_can_undo (doc);
 		act = g_action_map_lookup_action (G_ACTION_MAP (win), "undo");
 		g_simple_action_set_enabled (G_SIMPLE_ACTION (act), sensitive);
 	
-		sensitive = doc->undo_stack && doc->undo_top != doc->undo_stack;
+		sensitive = hex_document_get_can_redo (doc);
 		act = g_action_map_lookup_action (G_ACTION_MAP (win), "redo");
 		g_simple_action_set_enabled (G_SIMPLE_ACTION (act), sensitive);
 
@@ -128,13 +128,11 @@ undo_cb (GSimpleAction *action,
 
 	doc = gtk_hex_get_document (win->gh);
 
-	if(doc->undo_top) {
-		cd = (HexChangeData *)doc->undo_top->data;
-
+	if (hex_document_get_can_undo (doc)) {
+		cd = hex_document_get_last_change (doc);
 		hex_document_undo(doc);
-
-		gtk_hex_set_cursor(win->gh, cd->start);
-		gtk_hex_set_nibble(win->gh, cd->lower_nibble);
+		gtk_hex_set_cursor (win->gh, cd->start);
+		gtk_hex_set_nibble (win->gh, cd->lower_nibble);
 	}
 }
 
@@ -152,12 +150,10 @@ redo_cb (GSimpleAction *action,
 
 	doc = gtk_hex_get_document (win->gh);
 
-	if(doc->undo_stack && doc->undo_top != doc->undo_stack) {
+	if (hex_document_get_can_redo(doc)) {
 		hex_document_redo(doc);
-
-		cd = (HexChangeData *)doc->undo_top->data;
-
-		gtk_hex_set_cursor(win->gh, cd->start);
-		gtk_hex_set_nibble(win->gh, cd->lower_nibble);
+		cd = hex_document_get_last_change (doc);
+		gtk_hex_set_cursor (win->gh, cd->start);
+		gtk_hex_set_nibble (win->gh, cd->lower_nibble);
 	}
 }

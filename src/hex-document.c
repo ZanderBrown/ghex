@@ -38,8 +38,8 @@ static void hex_document_finalize       (GObject *obj);
 static void hex_document_real_changed   (HexDocument *doc,
 										 gpointer change_data,
 										 gboolean undoable);
-static void hex_document_real_redo      (HexDocument *doc);
-static void hex_document_real_undo      (HexDocument *doc);
+static void hex_document_real_redo      (HexDocument   *doc);
+static void hex_document_real_undo      (HexDocument   *doc);
 static void move_gap_to                 (HexDocument *doc,
 										 guint offset,
 								  	     gint min_size);
@@ -53,6 +53,42 @@ static gboolean get_document_attributes (HexDocument *doc);
 
 #define DEFAULT_UNDO_DEPTH 1024
 
+G_DEFINE_POINTER_TYPE (HexChangeData, hex_change_data)
+
+typedef struct _HexDocumentPrivate HexDocumentPrivate;
+
+struct _HexDocumentPrivate
+{
+	GList *views;      /* a list of GtkHex widgets showing this document */
+
+	gchar *file_name;
+	gchar *path_end;
+
+	guchar *buffer;    /* data buffer */
+	guchar *gap_pos;   /* pointer to the start of insertion gap */
+	gint gap_size;     /* insertion gap size */
+	guint buffer_size; /* buffer size = file size + gap size */
+	guint file_size;   /* real file size */
+
+	gboolean changed;
+
+	GList *undo_stack; /* stack base */
+	GList *undo_top;   /* top of the stack (for redo) */
+	guint undo_depth;  /* number of els on stack */
+	guint undo_max;    /* max undo depth */
+};
+
+G_DEFINE_TYPE_WITH_PRIVATE (HexDocument, hex_document, G_TYPE_OBJECT)
+
+enum {
+	PROP_0,
+	PROP_CAN_UNDO,
+	PROP_CAN_REDO,
+	LAST_PROP
+};
+
+static GParamSpec *pspecs[LAST_PROP] = { NULL, };
+
 enum {
 	DOCUMENT_CHANGED,
 	UNDO,
@@ -62,8 +98,6 @@ enum {
 };
 
 static gint hex_signals[LAST_SIGNAL];
-
-static GObjectClass *parent_class = NULL;
 
 static GList *doc_list = NULL;
 
@@ -84,6 +118,7 @@ free_stack(GList *stack)
 static gint
 undo_stack_push(HexDocument *doc, HexChangeData *change_data)
 {
+	HexDocumentPrivate *priv = hex_document_get_instance_private (doc);
 	HexChangeData *cd;
 	GList *stack_rest;
 
@@ -91,12 +126,12 @@ undo_stack_push(HexDocument *doc, HexChangeData *change_data)
 	g_message("undo_stack_push");
 #endif
 
-	if(doc->undo_stack != doc->undo_top) {
-		stack_rest = doc->undo_stack;
-		doc->undo_stack = doc->undo_top;
-		if(doc->undo_top) {
-			doc->undo_top->prev->next = NULL;
-			doc->undo_top->prev = NULL;
+	if(priv->undo_stack != priv->undo_top) {
+		stack_rest = priv->undo_stack;
+		priv->undo_stack = priv->undo_top;
+		if(priv->undo_top) {
+			priv->undo_top->prev->next = NULL;
+			priv->undo_top->prev = NULL;
 		}
 		free_stack(stack_rest);
 	}
@@ -108,27 +143,27 @@ undo_stack_push(HexDocument *doc, HexChangeData *change_data)
 			memcpy(cd->v_string, change_data->v_string, cd->rep_len);
 		}
 
-		doc->undo_depth++;
+		priv->undo_depth++;
 
 #ifdef ENABLE_DEBUG
-		g_message("depth at: %d", doc->undo_depth);
+		g_message("depth at: %d", priv->undo_depth);
 #endif
 
-		if(doc->undo_depth > doc->undo_max) {
+		if(priv->undo_depth > priv->undo_max) {
 			GList *last;
 
 #ifdef ENABLE_DEBUG
 			g_message("forget last undo");
 #endif
 
-			last = g_list_last(doc->undo_stack);
-			doc->undo_stack = g_list_remove_link(doc->undo_stack, last);
-			doc->undo_depth--;
+			last = g_list_last(priv->undo_stack);
+			priv->undo_stack = g_list_remove_link(priv->undo_stack, last);
+			priv->undo_depth--;
 			free_stack(last);
 		}
 
-		doc->undo_stack = g_list_prepend(doc->undo_stack, cd);
-		doc->undo_top = doc->undo_stack;
+		priv->undo_stack = g_list_prepend(priv->undo_stack, cd);
+		priv->undo_top = priv->undo_stack;
 
 		return TRUE;
 	}
@@ -139,52 +174,59 @@ undo_stack_push(HexDocument *doc, HexChangeData *change_data)
 static void
 undo_stack_descend(HexDocument *doc)
 {
+	HexDocumentPrivate *priv = hex_document_get_instance_private (doc);
 #ifdef ENABLE_DEBUG
 	g_message("undo_stack_descend");
 #endif
 
-	if(doc->undo_top == NULL)
+	if(priv->undo_top == NULL)
 		return;
 
-	doc->undo_top = doc->undo_top->next;
-	doc->undo_depth--;
+	priv->undo_top = priv->undo_top->next;
+	priv->undo_depth--;
 
 #ifdef ENABLE_DEBUG
-	g_message("undo depth at: %d", doc->undo_depth);
+	g_message("undo depth at: %d", priv->undo_depth);
 #endif
+
+	g_object_notify (G_OBJECT (doc), "can-redo");
 }
 
 static void
 undo_stack_ascend(HexDocument *doc)
 {
+	HexDocumentPrivate *priv = hex_document_get_instance_private (doc);
 #ifdef ENABLE_DEBUG
 	g_message("undo_stack_ascend");
 #endif
 
-	if(doc->undo_stack == NULL || doc->undo_top == doc->undo_stack)
+	if(priv->undo_stack == NULL || priv->undo_top == priv->undo_stack)
 		return;
 
-	if(doc->undo_top == NULL)
-		doc->undo_top = g_list_last(doc->undo_stack);
+	if(priv->undo_top == NULL)
+		priv->undo_top = g_list_last(priv->undo_stack);
 	else
-		doc->undo_top = doc->undo_top->prev;
-	doc->undo_depth++;
+		priv->undo_top = priv->undo_top->prev;
+	priv->undo_depth++;
+
+	g_object_notify (G_OBJECT (doc), "can-undo");
 }
 
 static void
 undo_stack_free(HexDocument *doc)
 {
+	HexDocumentPrivate *priv = hex_document_get_instance_private (doc);
 #ifdef ENABLE_DEBUG
 	g_message("undo_stack_free");
 #endif
 
-	if(doc->undo_stack == NULL)
+	if(priv->undo_stack == NULL)
 		return;
 
-	free_stack(doc->undo_stack);
-	doc->undo_stack = NULL;
-	doc->undo_top = NULL;
-	doc->undo_depth = 0;
+	free_stack(priv->undo_stack);
+	priv->undo_stack = NULL;
+	priv->undo_top = NULL;
+	priv->undo_depth = 0;
 
 	g_signal_emit(G_OBJECT(doc), hex_signals[UNDO_STACK_FORGET], 0);
 }
@@ -192,14 +234,15 @@ undo_stack_free(HexDocument *doc)
 static gboolean
 get_document_attributes(HexDocument *doc)
 {
+	HexDocumentPrivate *priv = hex_document_get_instance_private (doc);
 	static struct stat stats;
 
-	if(doc->file_name == NULL)
+	if(priv->file_name == NULL)
 		return FALSE;
 
-	if(!stat(doc->file_name, &stats) &&
+	if(!stat(priv->file_name, &stats) &&
 	   S_ISREG(stats.st_mode)) {
-		doc->file_size = stats.st_size;
+		priv->file_size = stats.st_size;
 
 		return TRUE;
 	}
@@ -211,44 +254,45 @@ get_document_attributes(HexDocument *doc)
 static void
 move_gap_to(HexDocument *doc, guint offset, gint min_size)
 {
+	HexDocumentPrivate *priv = hex_document_get_instance_private (doc);
 	guchar *tmp, *buf_ptr, *tmp_ptr;
 
-	if(doc->gap_size < min_size) {
-		tmp = g_malloc(sizeof(guchar)*doc->file_size);
-		buf_ptr = doc->buffer;
+	if(priv->gap_size < min_size) {
+		tmp = g_malloc(sizeof(guchar)*priv->file_size);
+		buf_ptr = priv->buffer;
 		tmp_ptr = tmp;
-		while(buf_ptr < doc->gap_pos)
+		while(buf_ptr < priv->gap_pos)
 			*tmp_ptr++ = *buf_ptr++;
-		buf_ptr += doc->gap_size;
-		while(buf_ptr < doc->buffer + doc->buffer_size)
+		buf_ptr += priv->gap_size;
+		while(buf_ptr < priv->buffer + priv->buffer_size)
 			*tmp_ptr++ = *buf_ptr++;
 
-		doc->gap_size = MAX(min_size, 32);
-		doc->buffer_size = doc->file_size + doc->gap_size;
-		doc->buffer = g_realloc(doc->buffer, sizeof(guchar)*doc->buffer_size);
-		doc->gap_pos = doc->buffer + offset;
+		priv->gap_size = MAX(min_size, 32);
+		priv->buffer_size = priv->file_size + priv->gap_size;
+		priv->buffer = g_realloc(priv->buffer, sizeof(guchar)*priv->buffer_size);
+		priv->gap_pos = priv->buffer + offset;
 
-		buf_ptr = doc->buffer;
+		buf_ptr = priv->buffer;
 		tmp_ptr = tmp;
 		
-		while(buf_ptr < doc->gap_pos)
+		while(buf_ptr < priv->gap_pos)
 			*buf_ptr++ = *tmp_ptr++;
-		buf_ptr += doc->gap_size;
-		while(buf_ptr < doc->buffer + doc->buffer_size)
+		buf_ptr += priv->gap_size;
+		while(buf_ptr < priv->buffer + priv->buffer_size)
 			*buf_ptr++ = *tmp_ptr++;
 
 		g_free(tmp);
 	}
 	else {
-		if(doc->buffer + offset < doc->gap_pos) {
-			buf_ptr = doc->gap_pos + doc->gap_size - 1;
-			while(doc->gap_pos > doc->buffer + offset)
-				*buf_ptr-- = *(--doc->gap_pos);
+		if(priv->buffer + offset < priv->gap_pos) {
+			buf_ptr = priv->gap_pos + priv->gap_size - 1;
+			while(priv->gap_pos > priv->buffer + offset)
+				*buf_ptr-- = *(--priv->gap_pos);
 		}
-		else if(doc->buffer + offset > doc->gap_pos) {
-			buf_ptr = doc->gap_pos + doc->gap_size;
-			while(doc->gap_pos < doc->buffer + offset)
-				*doc->gap_pos++ = *buf_ptr++;
+		else if(priv->buffer + offset > priv->gap_pos) {
+			buf_ptr = priv->gap_pos + priv->gap_size;
+			while(priv->gap_pos < priv->buffer + offset)
+				*priv->gap_pos++ = *buf_ptr++;
 		}
 	}
 }
@@ -256,6 +300,7 @@ move_gap_to(HexDocument *doc, guint offset, gint min_size)
 GtkWidget *
 hex_document_add_view(HexDocument *doc)
 {
+	HexDocumentPrivate *priv = hex_document_get_instance_private (doc);
 	GtkWidget *new_view;
 	
 	new_view = gtk_hex_new(doc);
@@ -268,7 +313,7 @@ hex_document_add_view(HexDocument *doc)
 
 	g_object_ref(new_view);
 
-	doc->views = g_list_append(doc->views, new_view);
+	priv->views = g_list_append(priv->views, new_view);
 
 	return new_view;
 }
@@ -276,56 +321,111 @@ hex_document_add_view(HexDocument *doc)
 void
 hex_document_remove_view(HexDocument *doc, GtkWidget *view)
 {
-	if(g_list_index(doc->views, view) == -1)
+	HexDocumentPrivate *priv = hex_document_get_instance_private (doc);
+	if(g_list_index(priv->views, view) == -1)
 		return;
 
-	doc->views = g_list_remove(doc->views, view);
+	priv->views = g_list_remove(priv->views, view);
 
 	g_object_unref(view);
+
+	if (!priv->views) /* If we have destroyed the last view */
+		g_object_unref (G_OBJECT (doc));
 }
 
 static void
 hex_document_finalize(GObject *obj)
 {
 	HexDocument *hex;
+	HexDocumentPrivate *priv;
 	
 	hex = HEX_DOCUMENT(obj);
+	priv = hex_document_get_instance_private (hex);
 	
-	if(hex->buffer)
-		g_free(hex->buffer);
+	if(priv->buffer)
+		g_free(priv->buffer);
 	
-	if(hex->file_name)
-		g_free(hex->file_name);
+	if(priv->file_name)
+		g_free(priv->file_name);
 
-	if(hex->path_end)
-		g_free(hex->path_end);
+	if(priv->path_end)
+		g_free(priv->path_end);
 
 	undo_stack_free(hex);
 
-	while(hex->views)
-		hex_document_remove_view(hex, (GtkWidget *)hex->views->data);
+	while(priv->views)
+		hex_document_remove_view(hex, (GtkWidget *)priv->views->data);
 
 	doc_list = g_list_remove(doc_list, hex);
 
-	G_OBJECT_CLASS (parent_class)->finalize (obj);
+	G_OBJECT_CLASS (hex_document_parent_class)->finalize (obj);
 }
 
 static void
 hex_document_real_changed(HexDocument *doc, gpointer change_data,
 						  gboolean push_undo)
 {
-	if(push_undo && doc->undo_max > 0)
+	HexDocumentPrivate *priv = hex_document_get_instance_private (doc);
+
+	if(push_undo && priv->undo_max > 0)
 		undo_stack_push(doc, change_data);
+}
+
+static void
+hex_document_set_property (GObject      *object,
+                           guint         property_id,
+                           const GValue *value,
+                           GParamSpec   *pspec)
+{
+	/*HexDocument *data = HEX_DOCUMENT (object);
+	HexDocumentPrivate *priv = hex_document_get_instance_private (data);*/
+
+	switch (property_id) {
+		default:
+			G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
+			break;
+	}
+}
+
+static void
+hex_document_get_property (GObject    *object,
+                           guint       property_id,
+                           GValue     *value,
+                           GParamSpec *pspec)
+{
+	HexDocument *data = HEX_DOCUMENT (object);
+
+	switch (property_id) {
+		case PROP_CAN_UNDO:
+			g_value_set_boolean (value, hex_document_get_can_undo (data));
+			break;
+		case PROP_CAN_REDO:
+			g_value_set_boolean (value, hex_document_get_can_redo (data));
+			break;
+		default:
+			G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
+			break;
+	}
 }
 
 static void
 hex_document_class_init (HexDocumentClass *klass)
 {
-	GObjectClass *gobject_class = G_OBJECT_CLASS(klass);
-	
-	parent_class = g_type_class_peek_parent(klass);
-	
-	gobject_class->finalize = hex_document_finalize;
+	GObjectClass *object_class = G_OBJECT_CLASS(klass);
+
+	object_class->set_property = hex_document_set_property;
+	object_class->get_property = hex_document_get_property;
+	object_class->finalize = hex_document_finalize;
+
+	pspecs[PROP_CAN_UNDO] =
+		g_param_spec_boolean ("can-undo", "Can undo", NULL, FALSE,
+							  G_PARAM_READABLE);
+
+	pspecs[PROP_CAN_REDO] =
+		g_param_spec_boolean ("can-redo", "Can redo", NULL, FALSE,
+							  G_PARAM_READABLE);
+
+	g_object_class_install_properties (object_class, LAST_PROP, pspecs);
 	
 	klass->document_changed = hex_document_real_changed;
 	klass->undo = hex_document_real_undo;
@@ -334,7 +434,7 @@ hex_document_class_init (HexDocumentClass *klass)
 
 	hex_signals[DOCUMENT_CHANGED] = 
 		g_signal_new ("document_changed",
-					  G_TYPE_FROM_CLASS(gobject_class),
+					  G_OBJECT_CLASS_TYPE (object_class),
 					  G_SIGNAL_RUN_FIRST,
 					  G_STRUCT_OFFSET (HexDocumentClass, document_changed),
 					  NULL,
@@ -344,7 +444,7 @@ hex_document_class_init (HexDocumentClass *klass)
 					  2, G_TYPE_POINTER, G_TYPE_BOOLEAN);
 	hex_signals[UNDO] = 
 		g_signal_new ("undo",
-					  G_TYPE_FROM_CLASS(gobject_class),
+					  G_OBJECT_CLASS_TYPE (object_class),
 					  G_SIGNAL_RUN_FIRST,
 					  G_STRUCT_OFFSET (HexDocumentClass, undo),
 					  NULL,
@@ -353,7 +453,7 @@ hex_document_class_init (HexDocumentClass *klass)
 					  G_TYPE_NONE, 0);
 	hex_signals[REDO] = 
 		g_signal_new ("redo",
-					  G_TYPE_FROM_CLASS(gobject_class),
+					  G_OBJECT_CLASS_TYPE (object_class),
 					  G_SIGNAL_RUN_FIRST,
 					  G_STRUCT_OFFSET (HexDocumentClass, redo),
 					  NULL,
@@ -362,7 +462,7 @@ hex_document_class_init (HexDocumentClass *klass)
 					  G_TYPE_NONE, 0);
 	hex_signals[UNDO_STACK_FORGET] = 
 		g_signal_new ("undo_stack_forget",
-					  G_TYPE_FROM_CLASS(gobject_class),
+					  G_OBJECT_CLASS_TYPE (object_class),
 					  G_SIGNAL_RUN_FIRST,
 					  G_STRUCT_OFFSET (HexDocumentClass, undo_stack_forget),
 					  NULL,
@@ -374,88 +474,51 @@ hex_document_class_init (HexDocumentClass *klass)
 static void
 hex_document_init (HexDocument *doc)
 {
-	doc->buffer = NULL;
-	doc->buffer_size = 0;
-	doc->file_size = 0;
-	doc->gap_pos = NULL;
-	doc->gap_size = 0;
-	doc->changed = FALSE;
-	doc->undo_stack = NULL;
-	doc->undo_top = NULL;
-	doc->undo_depth = 0;
-	doc->undo_max = DEFAULT_UNDO_DEPTH;
+	HexDocumentPrivate *priv = hex_document_get_instance_private (doc);
+
+	priv->file_name = NULL;
+	priv->file_size = 0;
+	priv->gap_size = 100;
+	priv->buffer_size = priv->file_size + priv->gap_size;
+	priv->gap_pos = priv->buffer = (guchar *)g_malloc(priv->buffer_size);
+	priv->changed = FALSE;
+	priv->undo_stack = NULL;
+	priv->undo_top = NULL;
+	priv->undo_depth = 0;
+	priv->undo_max = DEFAULT_UNDO_DEPTH;
+	priv->path_end = g_strdup(_("New document"));
+
+	doc_list = g_list_append(doc_list, doc);
 }
-
-GType
-hex_document_get_type (void)
-{
-	static GType doc_type = 0;
-	
-	if (!doc_type) {
-		static const GTypeInfo doc_info = {
-			sizeof (HexDocumentClass),
-			NULL,		/* base_init */
-			NULL,		/* base_finalize */
-			(GClassInitFunc) hex_document_class_init,
-			NULL,		/* class_finalize */
-			NULL,		/* class_data */
-			sizeof (HexDocument),
-			0,
-			(GInstanceInitFunc) hex_document_init
-		};
-	
-		doc_type = g_type_register_static (G_TYPE_OBJECT,
-										   "HexDocument",
-										   &doc_info,
-										   0);	
-	}
-
-	return doc_type;
-}
-
 
 /*-------- public API starts here --------*/
-
 
 HexDocument *
 hex_document_new()
 {
-	HexDocument *doc;
-
-	doc = HEX_DOCUMENT (g_object_new (hex_document_get_type(), NULL));
-	g_return_val_if_fail (doc != NULL, NULL);
-
-	doc->file_name = NULL;
-
-	doc->gap_size = 100;
-	doc->file_size = 0;
-	doc->buffer_size = doc->file_size + doc->gap_size;
-	doc->gap_pos = doc->buffer = (guchar *)g_malloc(doc->buffer_size);
-
-	doc->path_end = g_strdup(_("New document"));
-
-	doc_list = g_list_append(doc_list, doc);
-	return doc;
+	return g_object_new (HEX_TYPE_DOCUMENT, NULL);
 }
 
 HexDocument *
 hex_document_new_from_file(const gchar *name)
 {
 	HexDocument *doc;
+	HexDocumentPrivate *priv;
 	gchar *path_end;
 
 	doc = HEX_DOCUMENT (g_object_new (hex_document_get_type(), NULL));
+	priv = hex_document_get_instance_private (doc);
 	g_return_val_if_fail (doc != NULL, NULL);
 
-	doc->file_name = (gchar *)g_strdup(name);
+	priv->file_name = (gchar *)g_strdup(name);
 	if(get_document_attributes(doc)) {
-		doc->gap_size = 100;
-		doc->buffer_size = doc->file_size + doc->gap_size;
-		doc->buffer = (guchar *)g_malloc(doc->buffer_size);
+		priv->gap_size = 100;
+		priv->buffer_size = priv->file_size + priv->gap_size;
+		priv->buffer = (guchar *)g_malloc(priv->buffer_size);
 
 		/* find the start of the filename without path */
-		path_end = g_path_get_basename (doc->file_name);
-		doc->path_end = g_filename_to_utf8 (path_end, -1, NULL, NULL, NULL);
+		path_end = g_path_get_basename (priv->file_name);
+		priv->path_end = g_filename_to_utf8 (path_end, -1, NULL, NULL, NULL);
 		g_free (path_end);
 
 		if(hex_document_read(doc)) {
@@ -471,10 +534,11 @@ hex_document_new_from_file(const gchar *name)
 guchar
 hex_document_get_byte(HexDocument *doc, guint offset)
 {
-	if(offset < doc->file_size) {
-		if(doc->gap_pos <= doc->buffer + offset)
-			offset += doc->gap_size;
-		return doc->buffer[offset];
+	HexDocumentPrivate *priv = hex_document_get_instance_private (doc);
+	if(offset < priv->file_size) {
+		if(priv->gap_pos <= priv->buffer + offset)
+			offset += priv->gap_size;
+		return priv->buffer[offset];
 	}
 	else
 		return 0;
@@ -483,17 +547,18 @@ hex_document_get_byte(HexDocument *doc, guint offset)
 guchar *
 hex_document_get_data(HexDocument *doc, guint offset, guint len)
 {
+	HexDocumentPrivate *priv = hex_document_get_instance_private (doc);
 	guchar *ptr, *data, *dptr;
 	guint i;
 
-	ptr = doc->buffer + offset;
-	if(ptr >= doc->gap_pos)
-		ptr += doc->gap_size;
+	ptr = priv->buffer + offset;
+	if(ptr >= priv->gap_pos)
+		ptr += priv->gap_size;
 	dptr = data = g_malloc(sizeof(guchar)*len);
 	i = 0;
 	while(i < len) {
-		if(ptr >= doc->gap_pos && ptr < doc->gap_pos + doc->gap_size)
-			ptr += doc->gap_size;
+		if(ptr >= priv->gap_pos && ptr < priv->gap_pos + priv->gap_size)
+			ptr += priv->gap_size;
 		*dptr++ = *ptr++;
 		i++;
 	}
@@ -506,13 +571,14 @@ hex_document_set_nibble(HexDocument *doc, guchar val, guint offset,
 						gboolean lower_nibble, gboolean insert,
 						gboolean undoable)
 {
+	HexDocumentPrivate *priv = hex_document_get_instance_private (doc);
 	static HexChangeData change_data;
 
-	if(offset <= doc->file_size) {
-		if(!insert && offset == doc->file_size)
+	if(offset <= priv->file_size) {
+		if(!insert && offset == priv->file_size)
 			return;
 
-		doc->changed = TRUE;
+		priv->changed = TRUE;
 		change_data.start = offset;
 		change_data.end = offset;
 		change_data.v_string = NULL;
@@ -521,21 +587,21 @@ hex_document_set_nibble(HexDocument *doc, guchar val, guint offset,
 		change_data.insert = insert;
 		if(!lower_nibble && insert) {
 			move_gap_to(doc, offset, 1);
-			doc->gap_size--;
-			doc->gap_pos++;
-			doc->file_size++;
+			priv->gap_size--;
+			priv->gap_pos++;
+			priv->file_size++;
 			change_data.rep_len = 0;
-			if(offset == doc->file_size)
-				doc->buffer[offset] = 0;
+			if(offset == priv->file_size)
+				priv->buffer[offset] = 0;
 		}
 		else {
-			if(doc->buffer + offset >= doc->gap_pos)
-				offset += doc->gap_size;
+			if(priv->buffer + offset >= priv->gap_pos)
+				offset += priv->gap_size;
 			change_data.rep_len = 1;
 		}
 
-		change_data.v_byte = doc->buffer[offset];
-		doc->buffer[offset] = (doc->buffer[offset] & (lower_nibble?0xF0:0x0F)) | (lower_nibble?val:(val << 4));
+		change_data.v_byte = priv->buffer[offset];
+		priv->buffer[offset] = (priv->buffer[offset] & (lower_nibble?0xF0:0x0F)) | (lower_nibble?val:(val << 4));
 
 	 	hex_document_changed(doc, &change_data, undoable);
 	}
@@ -545,13 +611,14 @@ void
 hex_document_set_byte(HexDocument *doc, guchar val, guint offset,
 					  gboolean insert, gboolean undoable)
 {
+	HexDocumentPrivate *priv = hex_document_get_instance_private (doc);
 	static HexChangeData change_data;
 
-	if(offset <= doc->file_size) {
-		if(!insert && offset == doc->file_size)
+	if(offset <= priv->file_size) {
+		if(!insert && offset == priv->file_size)
 			return;
 
-		doc->changed = TRUE;
+		priv->changed = TRUE;
 		change_data.start = offset;
 		change_data.end = offset;
 		change_data.rep_len = (insert?0:1);
@@ -561,15 +628,15 @@ hex_document_set_byte(HexDocument *doc, guchar val, guint offset,
 		change_data.insert = insert;
 		if(insert) {
 			move_gap_to(doc, offset, 1);
-			doc->gap_size--;
-			doc->gap_pos++;
-			doc->file_size++;
+			priv->gap_size--;
+			priv->gap_pos++;
+			priv->file_size++;
 		}
-		else if(doc->buffer + offset >= doc->gap_pos)
-			offset += doc->gap_size;
+		else if(priv->buffer + offset >= priv->gap_pos)
+			offset += priv->gap_size;
 			
-		change_data.v_byte = doc->buffer[offset];
-		doc->buffer[offset] = val;
+		change_data.v_byte = priv->buffer[offset];
+		priv->buffer[offset] = val;
 
 	 	hex_document_changed(doc, &change_data, undoable);
 	}
@@ -579,15 +646,16 @@ void
 hex_document_set_data(HexDocument *doc, guint offset, guint len,
 					  guint rep_len, guchar *data, gboolean undoable)
 {
+	HexDocumentPrivate *priv = hex_document_get_instance_private (doc);
 	guint i;
 	guchar *ptr;
 	static HexChangeData change_data;
 
-	if(offset <= doc->file_size) {
-		if(doc->file_size - offset < rep_len)
-			rep_len -= doc->file_size - offset;
+	if(offset <= priv->file_size) {
+		if(priv->file_size - offset < rep_len)
+			rep_len -= priv->file_size - offset;
 
-		doc->changed = TRUE;
+		priv->changed = TRUE;
 		
 		change_data.v_string = g_realloc(change_data.v_string, rep_len);
 		change_data.start = offset;
@@ -597,19 +665,19 @@ hex_document_set_data(HexDocument *doc, guint offset, guint len,
 		change_data.lower_nibble = FALSE;
 		
 		i = 0;
-		ptr = &doc->buffer[offset];
-		if(ptr >= doc->gap_pos)
-			ptr += doc->gap_size;
-		while(offset + i < doc->file_size && i < rep_len) {
-			if(ptr >= doc->gap_pos && ptr < doc->gap_pos + doc->gap_size)
-				ptr += doc->gap_size;
+		ptr = &priv->buffer[offset];
+		if(ptr >= priv->gap_pos)
+			ptr += priv->gap_size;
+		while(offset + i < priv->file_size && i < rep_len) {
+			if(ptr >= priv->gap_pos && ptr < priv->gap_pos + priv->gap_size)
+				ptr += priv->gap_size;
 			change_data.v_string[i] = *ptr++;
 			i++;
 		}
 		
 		if(rep_len == len) {
-			if(doc->buffer + offset >= doc->gap_pos)
-				offset += doc->gap_size;
+			if(priv->buffer + offset >= priv->gap_pos)
+				offset += priv->gap_size;
 		}
 		else {
 			if(rep_len > len) {
@@ -618,14 +686,14 @@ hex_document_set_data(HexDocument *doc, guint offset, guint len,
 			else if(rep_len < len) {
 				move_gap_to(doc, offset + rep_len, len - rep_len);
 			}
-			doc->gap_pos -= (gint)rep_len - (gint)len;
-			doc->gap_size += (gint)rep_len - (gint)len;
-			doc->file_size += (gint)len - (gint)rep_len;
+			priv->gap_pos -= (gint)rep_len - (gint)len;
+			priv->gap_size += (gint)rep_len - (gint)len;
+			priv->file_size += (gint)len - (gint)rep_len;
 		}
 		
-		ptr = &doc->buffer[offset];
+		ptr = &priv->buffer[offset];
 		i = 0;
-		while(offset + i < doc->buffer_size && i < len) {
+		while(offset + i < priv->buffer_size && i < len) {
 			*ptr++ = *data++;
 			i++;
 		}
@@ -643,30 +711,31 @@ hex_document_delete_data(HexDocument *doc, guint offset, guint len, gboolean und
 gint
 hex_document_read(HexDocument *doc)
 {
+	HexDocumentPrivate *priv = hex_document_get_instance_private (doc);
 	FILE *file;
 	static HexChangeData change_data;
 
-	if(doc->file_name == NULL)
+	if(priv->file_name == NULL)
 		return FALSE;
 
 	if(!get_document_attributes(doc))
 		return FALSE;
 
-	if((file = fopen(doc->file_name, "r")) == NULL)
+	if((file = fopen(priv->file_name, "r")) == NULL)
 		return FALSE;
 
-	doc->gap_size = doc->buffer_size - doc->file_size;
-	if(fread(doc->buffer + doc->gap_size, 1, doc->file_size, file) != doc->file_size)
+	priv->gap_size = priv->buffer_size - priv->file_size;
+	if(fread(priv->buffer + priv->gap_size, 1, priv->file_size, file) != priv->file_size)
 	{
 		g_return_val_if_reached(FALSE);
 	}
-	doc->gap_pos = doc->buffer;
+	priv->gap_pos = priv->buffer;
 	fclose(file);
 	undo_stack_free(doc);
 
 	change_data.start = 0;
-	change_data.end = doc->file_size - 1;
-	doc->changed = FALSE;
+	change_data.end = priv->file_size - 1;
+	priv->changed = FALSE;
 	hex_document_changed(doc, &change_data, FALSE);
 
 	return TRUE;
@@ -675,17 +744,18 @@ hex_document_read(HexDocument *doc)
 gint
 hex_document_write_to_file(HexDocument *doc, FILE *file)
 {
+	HexDocumentPrivate *priv = hex_document_get_instance_private (doc);
 	gint ret = TRUE;
 	size_t exp_len;
 
-	if(doc->gap_pos > doc->buffer) {
-		exp_len = MIN(doc->file_size, doc->gap_pos - doc->buffer);
-		ret = fwrite(doc->buffer, 1, exp_len, file);
+	if(priv->gap_pos > priv->buffer) {
+		exp_len = MIN(priv->file_size, priv->gap_pos - priv->buffer);
+		ret = fwrite(priv->buffer, 1, exp_len, file);
 		ret = (ret == exp_len)?TRUE:FALSE;
 	}
-	if(doc->gap_pos < doc->buffer + doc->file_size) {
-		exp_len = doc->file_size - (size_t)(doc->gap_pos - doc->buffer);
-		ret = fwrite(doc->gap_pos + doc->gap_size, 1, exp_len, file);
+	if(priv->gap_pos < priv->buffer + priv->file_size) {
+		exp_len = priv->file_size - (size_t)(priv->gap_pos - priv->buffer);
+		ret = fwrite(priv->gap_pos + priv->gap_size, 1, exp_len, file);
 		ret = (ret == exp_len)?TRUE:FALSE;
 	}
 
@@ -695,17 +765,18 @@ hex_document_write_to_file(HexDocument *doc, FILE *file)
 gint
 hex_document_write(HexDocument *doc)
 {
+	HexDocumentPrivate *priv = hex_document_get_instance_private (doc);
 	FILE *file;
 	gint ret = FALSE;
 
-	if(doc->file_name == NULL)
+	if(priv->file_name == NULL)
 		return FALSE;
 
-	if((file = fopen(doc->file_name, "wb")) != NULL) {
+	if((file = fopen(priv->file_name, "wb")) != NULL) {
 		ret = hex_document_write_to_file(doc, file);
 		fclose(file);
 		if(ret) {
-			doc->changed = FALSE;
+			priv->changed = FALSE;
 		}
 	}
 
@@ -723,16 +794,18 @@ hex_document_changed(HexDocument *doc, gpointer change_data,
 gboolean
 hex_document_has_changed(HexDocument *doc)
 {
-	return doc->changed;
+	HexDocumentPrivate *priv = hex_document_get_instance_private (doc);
+	return priv->changed;
 }
 
 void
 hex_document_set_max_undo(HexDocument *doc, guint max_undo)
 {
-	if(doc->undo_max != max_undo) {
-		if(doc->undo_max > max_undo)
+	HexDocumentPrivate *priv = hex_document_get_instance_private (doc);
+	if(priv->undo_max != max_undo) {
+		if(priv->undo_max > max_undo)
 			undo_stack_free(doc);
-		doc->undo_max = max_undo;
+		priv->undo_max = max_undo;
 	}
 }
 
@@ -747,6 +820,7 @@ hex_document_export_html(HexDocument *doc, gchar *html_path, gchar *base_name,
 						 guint start, guint end, guint cpl, guint lpp,
 						 guint cpw)
 {
+	HexDocumentPrivate *priv = hex_document_get_instance_private (doc);
 	GtkWidget *progress_dialog, *progress_bar;
 	FILE *file;
 	int page, line, pos, lines, pages, c;
@@ -777,13 +851,13 @@ hex_document_export_html(HexDocument *doc, gchar *html_path, gchar *base_name,
 	fprintf(file, "<CENTER>");
 	fprintf(file, "<TABLE BORDER=\"0\" CELLSPACING=\"0\" CELLPADDING=\"0\">\n");
 	fprintf(file, "<TR>\n<TD COLSPAN=\"3\"><B>%s</B></TD>\n</TR>\n",
-			doc->file_name?doc->file_name:doc->path_end);
+			priv->file_name?priv->file_name:priv->path_end);
 	fprintf(file, "<TR>\n<TD COLSPAN=\"3\">&nbsp;</TD>\n</TR>\n");
 	for(page = 0; page < pages; page++) {
 		fprintf(file, "<TR>\n<TD>\n<A HREF=\"%s%08d.html\"><PRE>", base_name, page);
 		fprintf(file, _("Page"));
 		fprintf(file, " %d</PRE></A>\n</TD>\n<TD>&nbsp;</TD>\n<TD VALIGN=\"CENTER\"><PRE>%08x -", page+1, page*cpl*lpp);
-		fprintf(file, " %08x</PRE></TD>\n</TR>\n", MIN((page+1)*cpl*lpp-1, doc->file_size-1));
+		fprintf(file, " %08x</PRE></TD>\n</TR>\n", MIN((page+1)*cpl*lpp-1, priv->file_size-1));
 	}
 	fprintf(file, "</TABLE>\n</CENTER>\n");
 	fprintf(file, "<HR WIDTH=\"100%%\">");
@@ -843,7 +917,7 @@ hex_document_export_html(HexDocument *doc, gchar *html_path, gchar *base_name,
 		fprintf(file, "\n</TD>\n");
 		fprintf(file, "<TD WIDTH=\"33%%\" ALIGN=\"CENTER\">\n");
 		fprintf(file, "<A HREF=\"%s.html\">", base_name);
-		fprintf(file, "%s:", doc->path_end);
+		fprintf(file, "%s:", priv->path_end);
 		fprintf(file, "</A>");
 		fprintf(file, " %d/%d", page+1, pages);
 		fprintf(file, "\n</TD>\n");
@@ -863,7 +937,7 @@ hex_document_export_html(HexDocument *doc, gchar *html_path, gchar *base_name,
 		fprintf(file, "<TABLE BORDER=\"1\" CELLSPACING=\"2\" CELLPADDING=\"2\">\n");
 		fprintf(file, "<TR>\n<TD>\n");
 		fprintf(file, "<TABLE BORDER=\"0\" CELLSPACING=\"0\" CELLPADDING=\"0\">\n");
-		for(line = 0; line < lpp && pos + line*cpl < doc->file_size; line++) {
+		for(line = 0; line < lpp && pos + line*cpl < priv->file_size; line++) {
 		/* offset of line*/
 			fprintf(file, "<TR>\n<TD>\n");
 			fprintf(file, "<PRE>%08x</PRE>\n", pos + line*cpl);
@@ -942,10 +1016,11 @@ gint
 hex_document_find_forward(HexDocument *doc, guint start, guchar *what,
 						  gint len, guint *found)
 {
+	HexDocumentPrivate *priv = hex_document_get_instance_private (doc);
 	guint pos;
 	
 	pos = start;
-	while(pos < doc->file_size) {
+	while(pos < priv->file_size) {
 		if(hex_document_compare_data(doc, what, pos, len) == 0) {
 			*found = pos;
 			return TRUE;
@@ -981,7 +1056,9 @@ hex_document_find_backward(HexDocument *doc, guint start, guchar *what,
 gboolean
 hex_document_undo(HexDocument *doc)
 {
-	if(doc->undo_top == NULL)
+	HexDocumentPrivate *priv = hex_document_get_instance_private (doc);
+
+	if(priv->undo_top == NULL)
 		return FALSE;
 
 	g_signal_emit(G_OBJECT(doc), hex_signals[UNDO], 0);
@@ -992,16 +1069,17 @@ hex_document_undo(HexDocument *doc)
 static void
 hex_document_real_undo(HexDocument *doc)
 {
-	HexChangeData *cd;
+	HexDocumentPrivate *priv = hex_document_get_instance_private (doc);
+	HexChangeData *cd
 	gint len;
 	guchar *rep_data;
 	gchar c_val;
 
-	cd = (HexChangeData *)doc->undo_top->data;
+	cd = (HexChangeData *) priv->undo_top->data;
 
 	switch(cd->type) {
 	case HEX_CHANGE_BYTE:
-		if(cd->start >= 0 && cd->end < doc->file_size) {
+		if(cd->start >= 0 && cd->end < priv->file_size) {
 			c_val = hex_document_get_byte(doc, cd->start);
 			if(cd->rep_len > 0)
 				hex_document_set_byte(doc, cd->v_byte, cd->start, FALSE, FALSE);
@@ -1031,14 +1109,16 @@ hex_document_real_undo(HexDocument *doc)
 gboolean
 hex_document_is_writable(HexDocument *doc)
 {
-	return (doc->file_name != NULL &&
-			access(doc->file_name, W_OK) == 0);
+	HexDocumentPrivate *priv = hex_document_get_instance_private (doc);
+	return (priv->file_name != NULL &&
+			access(priv->file_name, W_OK) == 0);
 }
 
 gboolean 
 hex_document_redo(HexDocument *doc)
 {
-	if(doc->undo_stack == NULL || doc->undo_top == doc->undo_stack)
+	HexDocumentPrivate *priv = hex_document_get_instance_private (doc);
+	if(priv->undo_stack == NULL || priv->undo_top == priv->undo_stack)
 		return FALSE;
 
 	g_signal_emit(G_OBJECT(doc), hex_signals[REDO], 0);
@@ -1047,20 +1127,21 @@ hex_document_redo(HexDocument *doc)
 }
 
 static void
-hex_document_real_redo(HexDocument *doc)
+hex_document_real_redo (HexDocument   *doc)
 {
-	HexChangeData *cd;
+	HexDocumentPrivate *priv = hex_document_get_instance_private (doc);
+	HexChangeData *cd
 	gint len;
 	guchar *rep_data;
 	gchar c_val;
 
 	undo_stack_ascend(doc);
 
-	cd = (HexChangeData *)doc->undo_top->data;
+	cd = (HexChangeData *) priv->undo_top->data;
 
 	switch(cd->type) {
 	case HEX_CHANGE_BYTE:
-		if(cd->start >= 0 && cd->end <= doc->file_size) {
+		if(cd->start >= 0 && cd->end <= priv->file_size) {
 			c_val = hex_document_get_byte(doc, cd->start);
 			if(cd->rep_len > 0)
 				hex_document_set_byte(doc, cd->v_byte, cd->start, FALSE, FALSE);
@@ -1088,8 +1169,88 @@ hex_document_real_redo(HexDocument *doc)
 	hex_document_changed(doc, cd, FALSE);
 }
 
+guint
+hex_document_get_file_size (HexDocument *self)
+{
+	HexDocumentPrivate *priv = hex_document_get_instance_private (self);
+	return priv->file_size;
+}
+
+const gchar *
+hex_document_get_file_name (HexDocument *self)
+{
+	HexDocumentPrivate *priv = hex_document_get_instance_private (self);
+	return priv->file_name;
+}
+
+void
+hex_document_set_file_name (HexDocument *self,
+                            const gchar *file)
+{
+	HexDocumentPrivate *priv = hex_document_get_instance_private (self);
+
+	g_free (priv->file_name);
+	priv->file_name = g_strdup (file);
+}
+
+const gchar *
+hex_document_get_path_end (HexDocument *self)
+{
+	HexDocumentPrivate *priv = hex_document_get_instance_private (self);
+	return priv->path_end;
+}
+
+void
+hex_document_set_path_end (HexDocument *self,
+                           const gchar *path_end)
+{
+	HexDocumentPrivate *priv = hex_document_get_instance_private (self);
+
+	g_free (priv->path_end);
+	priv->path_end = g_strdup (path_end);
+}
+
+void
+hex_document_set_changed (HexDocument *self,
+                          gboolean     changed)
+{
+	HexDocumentPrivate *priv = hex_document_get_instance_private (self);
+
+	priv->changed = changed;
+}
+
+
+gboolean
+hex_document_get_can_undo (HexDocument *self)
+{
+	HexDocumentPrivate *priv = hex_document_get_instance_private (self);
+	return priv->undo_top != NULL;
+}
+
+gboolean
+hex_document_get_can_redo (HexDocument *self)
+{
+	HexDocumentPrivate *priv = hex_document_get_instance_private (self);
+	return priv->undo_stack && priv->undo_top != priv->undo_stack;
+}
+
+GList *
+hex_document_get_views (HexDocument *self)
+{
+	HexDocumentPrivate *priv = hex_document_get_instance_private (self);
+	return priv->views;
+}
+
+HexChangeData *
+hex_document_get_last_change (HexDocument *self)
+{
+	HexDocumentPrivate *priv = hex_document_get_instance_private (self);
+	return priv->undo_top->data;
+}
+
 const GList *
 hex_document_get_list()
 {
 	return doc_list;
 }
+
