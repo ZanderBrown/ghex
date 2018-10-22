@@ -10,7 +10,7 @@ ghex_version_major = version_arr[0].to_int()
 ghex_version_minor = version_arr[1].to_int()
 ghex_version_micro = version_arr[2].to_int()
 
-libghex_version_major = version_arr[0].to_int()
+libghex_version_major = 4
 
 ghex_prefix = get_option('prefix')
 ghex_libdir = join_paths(ghex_prefix, get_option('libdir'))
@@ -91,6 +91,7 @@ update_icon_cache_prg = find_program('gtk-update-icon-cache', required : false)
 update_desktop_database_prg = find_program('update-desktop-database', required : false)
 compile_schemas_prg = find_program('glib-compile-schemas', required : false)
 
+subdir('lib')
 subdir('src')
 subdir('data')
 subdir('icons')

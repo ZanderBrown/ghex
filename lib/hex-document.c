@@ -1070,7 +1070,7 @@ static void
 hex_document_real_undo(HexDocument *doc)
 {
 	HexDocumentPrivate *priv = hex_document_get_instance_private (doc);
-	HexChangeData *cd
+	HexChangeData *cd;
 	gint len;
 	guchar *rep_data;
 	gchar c_val;
@@ -1130,7 +1130,7 @@ static void
 hex_document_real_redo (HexDocument   *doc)
 {
 	HexDocumentPrivate *priv = hex_document_get_instance_private (doc);
-	HexChangeData *cd
+	HexChangeData *cd;
 	gint len;
 	guchar *rep_data;
 	gchar c_val;
