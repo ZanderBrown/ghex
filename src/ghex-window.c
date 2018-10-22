@@ -704,7 +704,7 @@ cursor_moved_cb(GtkHex *gtkhex, gpointer user_data)
         /* returns 0 on buffer overflow, which is what we want */
         val.v[i] = gtk_hex_get_byte(gtkhex, current_pos+i);
     }
-    hex_dialog_updateview(win->dialog, &val);
+    hex_dialog_updateview (HEX_DIALOG (win->dialog), &val);
 }
 
 gboolean
@@ -749,17 +749,13 @@ ghex_window_load(GHexWindow *win, const gchar *filename)
     gtk_widget_show(vbox);
     gtk_box_pack_start(GTK_BOX(vbox), gh, TRUE, TRUE, 4);
 
-    win->dialog = hex_dialog_new();
-    win->dialog_widget = hex_dialog_getview(win->dialog);
-    gtk_box_pack_start(GTK_BOX(vbox), win->dialog_widget, FALSE, FALSE, 4);
+    win->dialog = hex_dialog_new ();
+    gtk_box_pack_start (GTK_BOX(vbox), win->dialog, FALSE, FALSE, 4);
     active = ghex_window_get_toggle_action_active (win, "type-tool");
-    if (active)
-    {
-      gtk_widget_show(win->dialog_widget);
-    }
-    else
-    {
-      gtk_widget_hide(win->dialog_widget);
+    if (active) {
+      gtk_widget_show (win->dialog);
+    } else {
+      gtk_widget_hide (win->dialog);
     }
 
     if(win->gh) {

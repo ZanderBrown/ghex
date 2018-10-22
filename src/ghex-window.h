@@ -58,8 +58,7 @@ struct _GHexWindow
 
     gboolean changed, undo_sens, redo_sens;
 
-    struct _HexDialog *dialog;
-    GtkWidget *dialog_widget;
+    GtkWidget *dialog;
 
 
     GtkWidget *characters;

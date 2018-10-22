@@ -1,4 +1,4 @@
-/* -*- Mode: C; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
+/* -*- Mode: C; tab-width: 4; indent-tabs-mode: t; c-basic-offset: 4 -*- */
 /*
  * Copright (c) David Hammerton 2003
  * David Hammerton <crazney@crazney.net>
@@ -33,8 +33,23 @@
 #include "gtkhex.h"
 #include "hex-dialog.h"
 
-static void hex_dialog_class_init     (HexDialogClass *);
-static void hex_dialog_init           (HexDialog *);
+struct _HexDialog
+{
+    GtkGrid    parent;
+    GtkWidget *entry[ENTRY_MAX];
+    GtkWidget *config_endian;
+    GtkWidget *config_hex;
+    HexConversionProperties properties;
+    HexDialogVal64 val;
+};
+
+G_DEFINE_TYPE (HexDialog, hex_dialog, GTK_TYPE_GRID)
+
+static void create_dialog_prop(HexDialog *self,
+                               HexDialogEntryTypes type,
+                               gint xpos, gint ypos);
+static void config_toggled_cb(GtkToggleButton *togglebutton, gpointer user_data);
+static void config_spinchange_cb(GtkSpinButton *spinbutton, gpointer user_data);
 
 void hex_dialog_update_entry_sizes(HexDialog *dialog);
 void hex_dialog_updateview(HexDialog *dialog, HexDialogVal64 *val);
@@ -73,67 +88,94 @@ static struct {
     { N_("Binary:"), HexConvert_bin }
 };
 
-
-
-GType hex_dialog_get_type (void)
+static void
+hex_dialog_init (HexDialog *self)
 {
-    static GType doc_type = 0;
+	GtkWidget *hbox;
+    GtkWidget *label;
+    GtkAdjustment *adjuster;
+	GtkWidget *spin;
+	int i;
 
-    if (doc_type == 0)
-    {
-        static const GTypeInfo doc_info =
-        {
-            sizeof (HexDialogClass),
-            NULL,       /* base_init */
-            NULL,       /* base_finalize */
-            (GClassInitFunc) hex_dialog_class_init,
-            NULL,       /* class_finalize */
-            NULL,       /* class_data */
-            sizeof (HexDialog),
-            0,
-            (GInstanceInitFunc) hex_dialog_init
-        };
-
-        doc_type = g_type_register_static (G_TYPE_OBJECT,
-                                           "HexDialog",
-                                           &doc_info,
-                                           0);
-    }
-    return doc_type;
-}
-
-static void hex_dialog_init (HexDialog *dialog)
-{
-    int i;
     for (i = 0; i < ENTRY_MAX; i++)
-        dialog->entry[i] = NULL;
-    dialog->config_endian = NULL;
-    dialog->config_hex = NULL;
-    dialog->properties.endian = LITTLE;
-    dialog->properties.hexHint = FALSE;
-    dialog->properties.streamBitsHint = 8;
+        self->entry[i] = NULL;
+    self->config_endian = NULL;
+    self->config_hex = NULL;
+    self->properties.endian = LITTLE;
+    self->properties.hexHint = FALSE;
+    self->properties.streamBitsHint = 8;
     for (i = 0; i < 8; i++)
-        dialog->val.v[i] = 0;
+        self->val.v[i] = 0;
+
+    gtk_grid_set_row_spacing (GTK_GRID (self), 4);
+    gtk_grid_set_column_spacing (GTK_GRID (self), 4);
+
+    create_dialog_prop (self, S8, 0, 0);
+    create_dialog_prop (self, US8, 0, 1);
+    create_dialog_prop (self, S16, 0, 2);
+    create_dialog_prop (self, US16, 0, 3);
+
+    create_dialog_prop (self, S32, 2, 0);
+    create_dialog_prop (self, US32, 2, 1);
+    create_dialog_prop (self, S64, 2, 2);
+    create_dialog_prop (self, US64, 2, 3);
+
+    create_dialog_prop (self, FLOAT32, 0, 4);
+    create_dialog_prop (self, FLOAT64, 2, 4);
+
+    create_dialog_prop (self, HEX, 4, 0);
+    create_dialog_prop (self, OCT, 4, 1);
+    create_dialog_prop (self, BIN, 4, 2);
+
+    hex_dialog_update_entry_sizes (self);
+
+    hbox = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, 0);
+    gtk_grid_attach (GTK_GRID (self), hbox, 0, 5, 6, 1);
+    gtk_widget_show(hbox);
+
+    self->config_endian = gtk_check_button_new_with_label(_("Show little endian decoding"));
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(self->config_endian), TRUE);
+    g_signal_connect(G_OBJECT(self->config_endian), "toggled",
+                     G_CALLBACK(config_toggled_cb), self);
+    gtk_widget_show(self->config_endian);
+    gtk_box_pack_start(GTK_BOX(hbox), self->config_endian, TRUE, FALSE, 4);
+
+    self->config_hex = gtk_check_button_new_with_label(_("Show unsigned and float as hexadecimal"));
+    g_signal_connect(G_OBJECT(self->config_hex), "toggled",
+                     G_CALLBACK(config_toggled_cb), self);
+    gtk_widget_show(self->config_hex);
+    gtk_box_pack_start(GTK_BOX(hbox), self->config_hex, TRUE, FALSE, 4);
+
+    label = gtk_label_new(_("Stream Length:"));
+    gtk_label_set_xalign (GTK_LABEL (label), 1.0);
+    gtk_label_set_yalign (GTK_LABEL (label), 0.5);
+    gtk_grid_attach (GTK_GRID (self), label, 4, 3, 1, 1);
+    gtk_widget_show(label);
+
+    adjuster = (GtkAdjustment *)gtk_adjustment_new(8.0, 1.0, 32.0, 1.0, 8.0, 0);
+    spin = gtk_spin_button_new(adjuster, 1.0, 0);
+    g_signal_connect(G_OBJECT(spin), "value-changed",
+                     G_CALLBACK(config_spinchange_cb), self);
+    gtk_grid_attach (GTK_GRID (self), spin, 5, 3, 1, 1);
+    gtk_widget_show(spin);
+
 }
 
-static void hex_dialog_class_init (HexDialogClass *klass)
+static void
+hex_dialog_class_init (HexDialogClass *klass)
 {
 }
 
-HexDialog *hex_dialog_new (void)
+GtkWidget *
+hex_dialog_new (void)
 {
-    HexDialog *dialog;
-
-    dialog = HEX_DIALOG(g_object_new(HEX_DIALOG_TYPE, NULL));
-    g_return_val_if_fail (dialog != NULL, NULL);
-
-    return dialog;
+	return g_object_new (HEX_TYPE_DIALOG, NULL);
 }
 
-static void create_dialog_prop(HexDialogEntryTypes type,
-                               HexDialog *dialog,
-                               GtkWidget *grid,
-                               gint xpos, gint ypos)
+static void
+create_dialog_prop (HexDialog *self,
+                    HexDialogEntryTypes type,
+                    gint xpos, gint ypos)
 {
     GtkWidget *label;
 
@@ -142,18 +184,18 @@ static void create_dialog_prop(HexDialogEntryTypes type,
     gtk_label_set_xalign (GTK_LABEL (label), 1.0);
     gtk_label_set_yalign (GTK_LABEL (label), 0.5);
     gtk_widget_set_hexpand (label, TRUE);
-    gtk_grid_attach (GTK_GRID (grid), label,
+    gtk_grid_attach (GTK_GRID (self), label,
                      xpos, ypos, 1, 1);
     gtk_widget_show(label);
 
-    dialog->entry[type] = g_object_new (GTK_TYPE_LABEL,
+    self->entry[type] = g_object_new (GTK_TYPE_LABEL,
                                         "selectable", TRUE,
                                         "halign", GTK_ALIGN_START,
                                         "hexpand", TRUE,
                                         "visible", TRUE,
                                         NULL);
-    gtk_style_context_add_class (gtk_widget_get_style_context (dialog->entry[type]), GTK_STYLE_CLASS_MONOSPACE);
-    gtk_grid_attach (GTK_GRID (grid), dialog->entry[type],
+    gtk_style_context_add_class (gtk_widget_get_style_context (self->entry[type]), GTK_STYLE_CLASS_MONOSPACE);
+    gtk_grid_attach (GTK_GRID (self), self->entry[type],
                      xpos+1, ypos, 1, 1);
 }
 
@@ -171,78 +213,6 @@ static void config_spinchange_cb(GtkSpinButton *spinbutton, gpointer user_data)
     HexDialog *dialog = HEX_DIALOG(user_data);
     dialog->properties.streamBitsHint = (guchar)gtk_spin_button_get_value(spinbutton);
     hex_dialog_updateview(dialog, NULL);
-}
-
-GtkWidget *hex_dialog_getview(HexDialog *dialog)
-{
-
-    GtkWidget *vbox;
-    GtkWidget *hbox;
-    GtkWidget *grid;
-    GtkWidget *label;
-    GtkAdjustment *adjuster;
-    GtkWidget *spin;
-
-    grid = gtk_grid_new ();
-    gtk_grid_set_row_spacing (GTK_GRID (grid), 4);
-    gtk_grid_set_column_spacing (GTK_GRID (grid), 4);
-    gtk_widget_show (grid);
-
-    vbox = gtk_box_new (GTK_ORIENTATION_VERTICAL, 0);
-    gtk_widget_set_vexpand (GTK_WIDGET (vbox), FALSE);
-    gtk_box_pack_start (GTK_BOX (vbox), grid, TRUE, FALSE, 4);
-    gtk_widget_show (vbox);
-
-    create_dialog_prop (S8, dialog, grid, 0, 0);
-    create_dialog_prop (US8, dialog, grid, 0, 1);
-    create_dialog_prop (S16, dialog, grid, 0, 2);
-    create_dialog_prop (US16, dialog, grid, 0, 3);
-
-    create_dialog_prop (S32, dialog, grid, 2, 0);
-    create_dialog_prop (US32, dialog, grid, 2, 1);
-    create_dialog_prop (S64, dialog, grid, 2, 2);
-    create_dialog_prop (US64, dialog, grid, 2, 3);
-
-    create_dialog_prop (FLOAT32, dialog, grid, 0, 4);
-    create_dialog_prop (FLOAT64, dialog, grid, 2, 4);
-
-    create_dialog_prop (HEX, dialog, grid, 4, 0);
-    create_dialog_prop (OCT, dialog, grid, 4, 1);
-    create_dialog_prop (BIN, dialog, grid, 4, 2);
-
-    hex_dialog_update_entry_sizes (dialog);
-
-    hbox = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, 0);
-    gtk_box_pack_start(GTK_BOX(vbox), hbox, TRUE, FALSE, 4);
-    gtk_widget_show(hbox);
-
-    dialog->config_endian = gtk_check_button_new_with_label(_("Show little endian decoding"));
-    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(dialog->config_endian), TRUE);
-    g_signal_connect(G_OBJECT(dialog->config_endian), "toggled",
-                     G_CALLBACK(config_toggled_cb), dialog);
-    gtk_widget_show(dialog->config_endian);
-    gtk_box_pack_start(GTK_BOX(hbox), dialog->config_endian, TRUE, FALSE, 4);
-
-    dialog->config_hex = gtk_check_button_new_with_label(_("Show unsigned and float as hexadecimal"));
-    g_signal_connect(G_OBJECT(dialog->config_hex), "toggled",
-                     G_CALLBACK(config_toggled_cb), dialog);
-    gtk_widget_show(dialog->config_hex);
-    gtk_box_pack_start(GTK_BOX(hbox), dialog->config_hex, TRUE, FALSE, 4);
-
-    label = gtk_label_new(_("Stream Length:"));
-    gtk_label_set_xalign (GTK_LABEL (label), 1.0);
-    gtk_label_set_yalign (GTK_LABEL (label), 0.5);
-    gtk_grid_attach (GTK_GRID (grid), label, 4, 3, 1, 1);
-    gtk_widget_show(label);
-
-    adjuster = (GtkAdjustment *)gtk_adjustment_new(8.0, 1.0, 32.0, 1.0, 8.0, 0);
-    spin = gtk_spin_button_new(adjuster, 1.0, 0);
-    g_signal_connect(G_OBJECT(spin), "value-changed",
-                     G_CALLBACK(config_spinchange_cb), dialog);
-    gtk_grid_attach (GTK_GRID (grid), spin, 5, 3, 1, 1);
-    gtk_widget_show(spin);
-
-    return vbox;
 }
 
 static char *dialog_prop_get_text(HexDialogEntryTypes type,

@@ -592,12 +592,12 @@ type_dialog_cb (GSimpleAction *action,
     if (!win->dialog)
         return;
     if (active) {
-        if (!gtk_widget_get_visible (win->dialog_widget)) {
-            gtk_widget_show (win->dialog_widget);
+        if (!gtk_widget_get_visible (win->dialog)) {
+            gtk_widget_show (win->dialog);
         }
     }
-    else if (gtk_widget_get_visible (win->dialog_widget)) {
-        gtk_widget_hide (GTK_WIDGET (win->dialog_widget));
+    else if (gtk_widget_get_visible (win->dialog)) {
+        gtk_widget_hide (GTK_WIDGET (win->dialog));
     }
 }
 

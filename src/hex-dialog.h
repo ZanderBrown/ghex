@@ -24,15 +24,6 @@
 
 #include <glib-object.h>
 
-#define HEX_DIALOG_TYPE           (hex_dialog_get_type())
-#define HEX_DIALOG(obj)           G_TYPE_CHECK_INSTANCE_CAST (obj, hex_dialog_get_type (), HexDialog)
-#define HEX_DIALOG_CLASS(klass)   G_TYPE_CHECK_CLASS_CAST (klass, hex_dialog_get_type (), HexDialogClass)
-#define IS_HEX_DIALOG(obj)        G_TYPE_CHECK_INSTANCE_TYPE (obj, hex_dialog_get_type ())
-
-
-typedef struct _HexDialog       HexDialog;
-typedef struct _HexDialogClass  HexDialogClass;
-
 typedef enum
 {
     S8 = 0,
@@ -69,25 +60,11 @@ typedef struct
     guchar streamBitsHint;
 } HexConversionProperties;
 
-struct _HexDialog
-{
-    GObject gobject;
+#define HEX_TYPE_DIALOG (hex_dialog_get_type ())
+G_DECLARE_FINAL_TYPE (HexDialog, hex_dialog, HEX, DIALOG, GtkGrid)
 
-    GtkWidget *entry[ENTRY_MAX];
-    GtkWidget *config_endian;
-    GtkWidget *config_hex;
-    HexConversionProperties properties;
-    HexDialogVal64 val;
-};
 
-struct _HexDialogClass
-{
-    GObjectClass parent_class;
-};
-
-GType        hex_dialog_get_type(void);
-HexDialog    *hex_dialog_new(void);
-GtkWidget    *hex_dialog_getview(HexDialog *);
+GtkWidget   *hex_dialog_new (void);
 void         hex_dialog_updateview(HexDialog *dialog, HexDialogVal64 *val);
 
 
