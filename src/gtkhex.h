@@ -39,15 +39,6 @@ G_BEGIN_DECLS
 #define LOWER_NIBBLE TRUE
 #define UPPER_NIBBLE FALSE
 
-#define GTK_TYPE_HEX                    (gtk_hex_get_type ())
-#define GTK_HEX(obj)                    (G_TYPE_CHECK_INSTANCE_CAST ((obj), GTK_TYPE_HEX, GtkHex))
-#define GTK_HEX_CLASS(klass)            (G_TYPE_CHECK_CLASS_CAST ((klass), GTK_TYPE_HEX, GtkHexClass))
-#define GTK_IS_HEX(obj)                 (G_TYPE_CHECK_INSTANCE_TYPE ((obj), GTK_TYPE_HEX))
-#define GTK_IS_HEX_CLASS(klass)         (G_TYPE_CHECK_CLASS_TYPE ((klass), GTK_TYPE_HEX))
-#define GTK_HEX_GET_CLASS(obj)          (G_TYPE_INSTANCE_GET_CLASS ((obj), GTK_TYPE_HEX, GtkHexClass))
-
-typedef struct _GtkHex GtkHex;
-typedef struct _GtkHexClass GtkHexClass;
 typedef struct _GtkHexChangeData GtkHexChangeData;
 
 typedef struct _GtkHex_Highlight GtkHex_Highlight;
@@ -70,54 +61,8 @@ struct _GtkHex_Highlight
  */
 typedef struct _GtkHex_AutoHighlight GtkHex_AutoHighlight;
 
-/* Private structure type */
-typedef struct _GtkHexPrivate GtkHexPrivate;
-
-struct _GtkHex
-{
-	GtkFixed fixed;
-	
-	HexDocument *document;
-	
-	GtkWidget *xdisp, *adisp, *scrollbar;
-	GtkWidget *offsets;
-
-	PangoLayout *xlayout, *alayout, *olayout; /* Changes for Gnome 2.0 */
-
-	GtkAdjustment *adj;
-
-	PangoFontMetrics *disp_font_metrics;
-	PangoFontDescription *font_desc;
-	GtkCssProvider *font_provider;
-
-	gint active_view;
-	
-	guint char_width, char_height;
-	guint button;
-	
-	guint cursor_pos;
-	GtkHex_Highlight selection;
-	gint lower_nibble;
-	
-	guint group_type;
-	
-	gint lines, vis_lines, cpl, top_line;
-	gint cursor_shown;
-	
-	gint xdisp_width, adisp_width, extra_width;
-	
-	/*< private > */
-	GtkHexPrivate *priv;
-
-	GtkHex_AutoHighlight *auto_highlight;
-	
-	gint scroll_dir;
-	guint scroll_timeout;
-	gboolean show_offsets;
-	gint starting_offset;
-	gboolean insert;
-	gboolean selecting;
-};
+#define GTK_TYPE_HEX (gtk_hex_get_type ())
+G_DECLARE_DERIVABLE_TYPE (GtkHex, gtk_hex, GTK, HEX, GtkFixed)
 
 struct _GtkHexClass
 {
@@ -131,8 +76,6 @@ struct _GtkHexClass
 	void (*copy_clipboard)(GtkHex *);
 	void (*paste_clipboard)(GtkHex *);
 };
-
-GType           gtk_hex_get_type                (void) G_GNUC_CONST;
 
 GtkWidget *gtk_hex_new(HexDocument *);
 
@@ -166,6 +109,21 @@ void     gtk_hex_set_selection(GtkHex *gh, gint start, gint end);
 gboolean gtk_hex_get_selection(GtkHex *gh, gint *start, gint *end);
 void     gtk_hex_clear_selection(GtkHex *gh);
 void     gtk_hex_delete_selection(GtkHex *gh);
+
+HexDocument *
+gtk_hex_get_document           (GtkHex *self);
+guint
+gtk_hex_get_cursor_pos         (GtkHex *self);
+guint
+gtk_hex_get_group_type         (GtkHex *self);
+gboolean
+gtk_hex_get_insert             (GtkHex *self);
+gint
+gtk_hex_get_visible_lines      (GtkHex *self);
+gint
+gtk_hex_get_cpl                (GtkHex *self);
+gint
+gtk_hex_get_active_view        (GtkHex *self);
 
 GtkHex_AutoHighlight *gtk_hex_insert_autohighlight(GtkHex *gh,
 												   const gchar *search,

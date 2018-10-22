@@ -261,14 +261,14 @@ g_hex_converter_response (GtkDialog *self,
 
 		if (view) {
 			start = gtk_hex_get_cursor (GTK_HEX (view));
-			start = start - start % GTK_HEX (view)->group_type;
+			start = start - start % gtk_hex_get_group_type (GTK_HEX (view));
 			val = 0;
 			do {
 				val <<= 8;
 				val |= gtk_hex_get_byte (GTK_HEX (view), start);
 				start++;
-			} while ((start % GTK_HEX (view)->group_type != 0) &&
-					 (start < GTK_HEX (view)->document->file_size) );
+			} while ((start % gtk_hex_get_group_type (GTK_HEX (view)) != 0) &&
+					 (start < gtk_hex_get_document (GTK_HEX (view))->file_size) );
 
 			g_hex_converter_update_values (G_HEX_CONVERTER (self), val);
 		}

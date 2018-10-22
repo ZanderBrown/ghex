@@ -102,9 +102,10 @@ g_hex_characters_row_activated (GtkTreeView       *tree,
 
 	gtk_tree_model_get_value(model, &iter, 2, &value);
 	if(win->gh) {
-		hex_document_set_byte(win->gh->document, (guchar)atoi(g_value_get_string(&value)), win->gh->cursor_pos,
-							  win->gh->insert, TRUE);
-		gtk_hex_set_cursor(win->gh, win->gh->cursor_pos + 1);
+		hex_document_set_byte (gtk_hex_get_document (win->gh), (guchar) atoi (g_value_get_string (&value)),
+							   gtk_hex_get_cursor_pos (win->gh),
+							   gtk_hex_get_insert (win->gh), TRUE);
+		gtk_hex_set_cursor(win->gh, gtk_hex_get_cursor_pos (win->gh) + 1);
 	}
 	g_value_unset(&value);
 }

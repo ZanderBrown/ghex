@@ -227,7 +227,7 @@ save_cb (GSimpleAction *action,
 	HexDocument *doc;
 
 	if(win->gh)
-		doc = win->gh->document;
+		doc = gtk_hex_get_document (win->gh);
 	else
 		doc = NULL;
 
@@ -297,7 +297,7 @@ open_cb (GSimpleAction *action,
 		if (win) {
 			gchar *gtk_file_name;
 			gtk_file_name = g_filename_to_utf8
-				(GHEX_WINDOW (win)->gh->document->file_name, -1,
+				(gtk_hex_get_document (GHEX_WINDOW (win)->gh)->file_name, -1,
 				 NULL, NULL, NULL);
 			flash = g_strdup_printf (_("Loaded file %s"), gtk_file_name);
 			ghex_window_flash (GHEX_WINDOW (win), flash);
@@ -323,7 +323,7 @@ save_as_cb (GSimpleAction *action,
 	HexDocument *doc;
 
 	if(win->gh)
-		doc = win->gh->document;
+		doc = gtk_hex_get_document (win->gh);
 	else
 		doc = NULL;
 
@@ -370,7 +370,7 @@ export_html_cb (GSimpleAction *action,
 	GtkResponseType resp;
 
 	if(win->gh)
-		doc = win->gh->document;
+		doc = gtk_hex_get_document (win->gh);
 	else
 		doc = NULL;
 
@@ -456,7 +456,9 @@ export_html_cb (GSimpleAction *action,
 		g_free(check_path);
 
 		hex_document_export_html(doc, html_path, base_name, 0, doc->file_size,
-								 view->cpl, view->vis_lines, view->group_type);
+								 gtk_hex_get_cpl (view),
+								 gtk_hex_get_visible_lines (view),
+								 gtk_hex_get_group_type (view));
 		g_free(html_path);
 		g_free(base_name);
 	}
@@ -483,7 +485,7 @@ close_cb (GSimpleAction *action,
 		return;
 	}
 
-	doc = window->gh->document;
+	doc = gtk_hex_get_document (window->gh);
 	
 	if (!ghex_window_ok_to_close (window))
 		return;
@@ -493,7 +495,7 @@ close_cb (GSimpleAction *action,
 		if (GHEX_IS_WINDOW (window_list->data)) {
 			other_win = GHEX_WINDOW(window_list->data);
 			window_list = window_list->next;
-			if(other_win->gh && other_win->gh->document == doc && other_win != window)
+			if(other_win->gh && gtk_hex_get_document (other_win->gh) == doc && other_win != window)
 				gtk_widget_destroy(GTK_WIDGET(other_win));
 		}
 	}
@@ -672,7 +674,7 @@ revert_cb (GSimpleAction *action,
 	
 	win = GHEX_WINDOW(window);
 	if(win->gh)
-		doc = win->gh->document;
+		doc = gtk_hex_get_document (win->gh);
 	else
 		doc = NULL;
 
@@ -727,12 +729,12 @@ ghex_print(GtkHex *gh, gboolean preview)
 	gchar *basename;
 	gchar *gtk_file_name;
 
-	doc = gh->document;
+	doc = gtk_hex_get_document (gh);
 
 	gtk_file_name = g_filename_to_utf8 (doc->file_name, -1, NULL, NULL, NULL);
 	basename = g_filename_display_basename (gtk_file_name);
 
-	pji = ghex_print_job_info_new(doc, gh->group_type);
+	pji = ghex_print_job_info_new(doc, gtk_hex_get_group_type (gh));
 	pji->master = gtk_print_operation_new ();
 	pji->config = gtk_print_settings_new ();
 	gtk_print_settings_set (pji->config, GTK_PRINT_SETTINGS_OUTPUT_BASENAME, basename);
@@ -825,7 +827,7 @@ add_view_cb (GSimpleAction *action,
 		return;
 
 	newwin = ghex_window_new_from_doc (G_HEX_APPLICATION (g_application_get_default ()),
-	                                   win->gh->document);
+	                                   gtk_hex_get_document (win->gh));
 	gtk_widget_show(newwin);
 }
 

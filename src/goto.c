@@ -105,15 +105,15 @@ g_hex_goto_response (GHexGoto *self, gint res, gpointer data)
 		   ((sscanf(byte_str, "0x%x", &byte) == 1) ||
 			(sscanf(byte_str, "%d", &byte) == 1))) {
 			if(is_relative) {
-				if(is_relative == -1 && byte > win->gh->cursor_pos) {
+				if(is_relative == -1 && byte > gtk_hex_get_cursor_pos (win->gh)) {
 					display_error_dialog(GTK_WIDGET (win),
 									     _("The specified offset is beyond the "
 									       " file boundaries!"));
 					return;
 				}
-				byte = byte * is_relative + win->gh->cursor_pos;
+				byte = byte * is_relative + gtk_hex_get_cursor_pos (win->gh);
 			}
-			if(byte >= win->gh->document->file_size)
+			if(byte >= gtk_hex_get_document (win->gh)->file_size)
 				display_error_dialog (GTK_WIDGET (win),
 									  _("Can not position cursor beyond the "
 									    "End Of File!"));

@@ -78,8 +78,8 @@ g_hex_replace_response (GHexReplace *self, gint res, gpointer data)
 	if (res == REPLACE_FIND) {
 		guint offset;
 
-		if (hex_document_find_forward (gh->document,
-									   gh->cursor_pos+1, (guchar *) str, str_len, &offset))
+		if (hex_document_find_forward (gtk_hex_get_document (gh),
+									   gtk_hex_get_cursor_pos (gh)+1, (guchar *) str, str_len, &offset))
 			gtk_hex_set_cursor (gh, offset);
 		else {
 			display_info_dialog (GTK_WINDOW (win), _("String was not found!\n"));
@@ -87,18 +87,18 @@ g_hex_replace_response (GHexReplace *self, gint res, gpointer data)
 		}
 	} else if (res == GTK_RESPONSE_APPLY) {
 		guint offset;
-		HexDocument *doc = win->gh->document;
+		HexDocument *doc = gtk_hex_get_document (win->gh);
 
 		rep_len = get_search_string (self->r_doc, &rep_str);
 
-		if (str_len > doc->file_size - gh->cursor_pos)
+		if (str_len > doc->file_size - gtk_hex_get_cursor_pos (gh))
 			goto clean_up;
 
-		if (hex_document_compare_data (doc, (guchar *) str, gh->cursor_pos, str_len) == 0)
-			hex_document_set_data (doc, gh->cursor_pos,
+		if (hex_document_compare_data (doc, (guchar *) str, gtk_hex_get_cursor_pos (gh), str_len) == 0)
+			hex_document_set_data (doc, gtk_hex_get_cursor_pos (gh),
 								   rep_len, str_len, (guchar *) rep_str, TRUE);
 
-		if (hex_document_find_forward(doc, gh->cursor_pos + rep_len, (guchar *) str, str_len,
+		if (hex_document_find_forward(doc, gtk_hex_get_cursor_pos (gh) + rep_len, (guchar *) str, str_len,
 									  &offset)) {
 			gtk_hex_set_cursor (gh, offset);
 		} else {
@@ -108,11 +108,11 @@ g_hex_replace_response (GHexReplace *self, gint res, gpointer data)
 	} else {
 		gchar *flash;
 		guint offset, count, cursor_pos;
-		HexDocument *doc = gh->document;
+		HexDocument *doc = gtk_hex_get_document (gh);
 
 		rep_len = get_search_string (self->r_doc, &rep_str);
 
-		if(str_len > doc->file_size - gh->cursor_pos)
+		if(str_len > doc->file_size - gtk_hex_get_cursor_pos (gh))
 			goto clean_up;
 
 		count = 0;

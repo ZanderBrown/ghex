@@ -126,7 +126,7 @@ undo_cb (GSimpleAction *action,
 	if(win->gh == NULL)
 		return;
 
-	doc = win->gh->document;
+	doc = gtk_hex_get_document (win->gh);
 
 	if(doc->undo_top) {
 		cd = (HexChangeData *)doc->undo_top->data;
@@ -150,7 +150,7 @@ redo_cb (GSimpleAction *action,
 	if(win->gh == NULL)
 		return;
 
-	doc = win->gh->document;
+	doc = gtk_hex_get_document (win->gh);
 
 	if(doc->undo_stack && doc->undo_top != doc->undo_stack) {
 		hex_document_redo(doc);

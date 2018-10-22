@@ -283,16 +283,16 @@ accessible_gtk_hex_get_text (AtkText *text,
 
 	gtk_hex = GTK_HEX (widget);
 
-	if (gtk_hex->active_view == VIEW_ASCII)
+	if (gtk_hex_get_active_view (gtk_hex) == VIEW_ASCII)
 	{
-		str = g_malloc (gtk_hex->document->file_size);
-		format_ablock (gtk_hex, str, 0, gtk_hex->document->file_size);
+		str = g_malloc (gtk_hex_get_document (gtk_hex)->file_size);
+		format_ablock (gtk_hex, str, 0, gtk_hex_get_document (gtk_hex)->file_size);
 	}
 
-	if (gtk_hex->active_view == VIEW_HEX)
+	if (gtk_hex_get_active_view (gtk_hex) == VIEW_HEX)
 	{
-		str = g_malloc (gtk_hex->document->file_size*3);
-		format_xblock (gtk_hex, str, 0,gtk_hex->document->file_size);
+		str = g_malloc (gtk_hex_get_document (gtk_hex)->file_size*3);
+		format_xblock (gtk_hex, str, 0,gtk_hex_get_document (gtk_hex)->file_size);
 	}
 
 	utf8 = g_locale_to_utf8 (str, -1, NULL, NULL, NULL);
@@ -358,7 +358,7 @@ accessible_gtk_hex_get_character_count (AtkText *text)
 	
 	gtk_hex = GTK_HEX (widget);
 
-	return gtk_hex->document->file_size;
+	return gtk_hex_get_document (gtk_hex)->file_size;
 }
 
 static gunichar
@@ -374,11 +374,11 @@ accessible_gtk_hex_get_character_at_offset (AtkText *text,
 	widget = gtk_accessible_get_widget (GTK_ACCESSIBLE (text));
 	gtk_hex = GTK_HEX (widget);
 
-	if (gtk_hex->active_view == VIEW_ASCII) {
+	if (gtk_hex_get_active_view (gtk_hex) == VIEW_ASCII) {
 		format_ablock (gtk_hex, str, offset, offset+1);
 		c = g_utf8_get_char_validated (str, 1);
 	}
-	if (gtk_hex->active_view == VIEW_HEX) {
+	if (gtk_hex_get_active_view (gtk_hex) == VIEW_HEX) {
 		format_xbyte (gtk_hex, offset, str);
 		c = g_utf8_get_char_validated (str, 2);
 	}
@@ -423,8 +423,8 @@ accessible_gtk_hex_set_text_contents (AtkEditableText *text,
 
 	len = g_utf8_strlen (string, -1);
 
-	hex_document_delete_data (gtkhex->document, 0, gtkhex->document->file_size, FALSE);
-	hex_document_set_data (gtkhex->document, 0, len, 0, (guchar *)string, TRUE);
+	hex_document_delete_data (gtk_hex_get_document (gtkhex), 0, gtk_hex_get_document (gtkhex)->file_size, FALSE);
+	hex_document_set_data (gtk_hex_get_document (gtkhex), 0, len, 0, (guchar *)string, TRUE);
 }
 
 static void
@@ -441,7 +441,7 @@ accessible_gtk_hex_insert_text (AtkEditableText *text,
 
 	gtkhex = GTK_HEX (widget);
 
-	hex_document_set_data (gtkhex->document, *position, length, 0, (guchar *)string, TRUE);
+	hex_document_set_data (gtk_hex_get_document (gtkhex), *position, length, 0, (guchar *)string, TRUE);
 
 }
 
@@ -460,7 +460,7 @@ accessible_gtk_hex_delete_text (AtkEditableText *text,
 
 	gtkhex = GTK_HEX (widget);
 
-	hex_document_delete_data (gtkhex->document, start_pos, end_pos-start_pos, FALSE);
+	hex_document_delete_data (gtk_hex_get_document (gtkhex), start_pos, end_pos-start_pos, FALSE);
 
 }
 
@@ -478,16 +478,16 @@ _accessible_gtk_hex_changed_cb (GtkHex *gtkhex)
 	g_signal_emit_by_name (accessible, "text_changed::delete");
 	g_signal_emit_by_name (accessible, "text_changed::insert");
 
-	if (gtkhex->active_view == VIEW_ASCII)
+	if (gtk_hex_get_active_view (gtkhex) == VIEW_ASCII)
 	{
-		str = g_malloc (gtkhex->document->file_size);
-		format_ablock (gtkhex, str, 0, gtkhex->document->file_size);
+		str = g_malloc (gtk_hex_get_document (gtkhex)->file_size);
+		format_ablock (gtkhex, str, 0, gtk_hex_get_document (gtkhex)->file_size);
 	}
 
-	if (gtkhex->active_view == VIEW_HEX)
+	if (gtk_hex_get_active_view (gtkhex) == VIEW_HEX)
 	{
-		str = g_malloc (gtkhex->document->file_size*3);
-		format_xblock (gtkhex, str, 0, gtkhex->document->file_size);
+		str = g_malloc (gtk_hex_get_document (gtkhex)->file_size*3);
+		format_xblock (gtkhex, str, 0, gtk_hex_get_document (gtkhex)->file_size);
 	}
 
 	utf8 = g_locale_to_utf8 (str, -1, NULL, NULL, NULL);

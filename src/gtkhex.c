@@ -43,10 +43,6 @@
 
 #define is_displayable(c) (((c) >= 0x20) && ((c) < 0x7f))
 
-#define GTKHEX_GET_PRIVATE(object)(G_TYPE_INSTANCE_GET_PRIVATE ((object),\
-                                   GTK_TYPE_HEX,                         \
-                                   GtkHexPrivate))
-
 enum {
 	CURSOR_MOVED_SIGNAL,
 	DATA_CHANGED_SIGNAL,
@@ -75,6 +71,8 @@ struct _GtkHex_AutoHighlight
 	GtkHex_AutoHighlight *next, *prev;
 };
 
+typedef struct _GtkHexPrivate GtkHexPrivate;
+
 struct _GtkHexPrivate
 {
 	/* Buffer for storing formatted data for rendering;
@@ -83,11 +81,51 @@ struct _GtkHexPrivate
 
 	gint default_cpl;
 	gint default_lines;
+
+
+	/* ========== */
+	HexDocument *document;
+
+	GtkWidget *xdisp, *adisp, *scrollbar;
+	GtkWidget *offsets;
+
+	PangoLayout *xlayout, *alayout, *olayout; /* Changes for Gnome 2.0 */
+
+	GtkAdjustment *adj;
+
+	PangoFontMetrics *disp_font_metrics;
+	PangoFontDescription *font_desc;
+	GtkCssProvider *font_provider;
+
+	gint active_view;
+
+	guint char_width, char_height;
+	guint button;
+
+	guint cursor_pos;
+	GtkHex_Highlight selection;
+	gint lower_nibble;
+
+	guint group_type;
+
+	gint lines, vis_lines, cpl, top_line;
+	gint cursor_shown;
+
+	gint xdisp_width, adisp_width, extra_width;
+
+	GtkHex_AutoHighlight *auto_highlight;
+
+	gint scroll_dir;
+	guint scroll_timeout;
+	gboolean show_offsets;
+	gint starting_offset;
+	gboolean insert;
+	gboolean selecting;
 };
 
+G_DEFINE_TYPE_WITH_PRIVATE (GtkHex, gtk_hex, GTK_TYPE_FIXED)
 static gint gtkhex_signals[LAST_SIGNAL] = { 0 };
 
-static GtkFixedClass *parent_class = NULL;
 static gchar *char_widths = NULL;
 
 static void render_hex_highlights (GtkHex *gh, cairo_t *cr, gint cursor_line);
@@ -125,37 +163,40 @@ static void redraw_widget(GtkWidget *w) {
  * to cursor coordinates.
  */
 static void hex_to_pointer(GtkHex *gh, guint mx, guint my) {
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
 	guint cx, cy, x;
 	
-	cy = gh->top_line + my/gh->char_height;
+	cy = priv->top_line + my/priv->char_height;
 	
 	cx = 0; x = 0;
-	while(cx < 2*gh->cpl) {
-		x += gh->char_width;
+	while(cx < 2*priv->cpl) {
+		x += priv->char_width;
 		
 		if(x > mx) {
 			gtk_hex_set_cursor_xy(gh, cx/2, cy);
 			gtk_hex_set_nibble(gh, ((cx%2 == 0)?UPPER_NIBBLE:LOWER_NIBBLE));
 			
-			cx = 2*gh->cpl;
+			cx = 2*priv->cpl;
 		}
 		
 		cx++;
 		
-		if(cx%(2*gh->group_type) == 0)
-			x += gh->char_width;
+		if(cx%(2*priv->group_type) == 0)
+			x += priv->char_width;
 	}
 }
 
 static void ascii_to_pointer(GtkHex *gh, gint mx, gint my) {
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
 	int cy;
 	
-	cy = gh->top_line + my/gh->char_height;
+	cy = priv->top_line + my/priv->char_height;
 	
-	gtk_hex_set_cursor_xy(gh, mx/gh->char_width, cy);
+	gtk_hex_set_cursor_xy(gh, mx/priv->char_width, cy);
 }
 
 static guint get_max_char_width(GtkHex *gh, PangoFontMetrics *font_metrics) {
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
 	/* this is, I guess, a rather dirty trick, but
 	   right now i can't think of anything better */
 	guint i;
@@ -170,7 +211,7 @@ static guint get_max_char_width(GtkHex *gh, PangoFontMetrics *font_metrics) {
 	char_widths[0] = 0;
 
 	layout = gtk_widget_create_pango_layout (GTK_WIDGET (gh), "");
-	pango_layout_set_font_description (layout, gh->font_desc);
+	pango_layout_set_font_description (layout, priv->font_desc);
 
 	for(i = 1; i < 0x100; i++) {
 		logical_rect.width = 0;
@@ -207,6 +248,7 @@ void format_xbyte(GtkHex *gh, gint pos, gchar buf[2]) {
  * into displayable text in hex or ascii, respectively
  */
 gint format_xblock(GtkHex *gh, gchar *out, guint start, guint end) {
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
 	int i, j, low, high;
 	guchar c;
 
@@ -218,7 +260,7 @@ gint format_xblock(GtkHex *gh, gchar *out, guint start, guint end) {
 		out[j++] = ((high < 10)?(high + '0'):(high - 10 + 'A'));
 		out[j++] = ((low < 10)?(low + '0'):(low - 10 + 'A'));
 		
-		if(i%gh->group_type == 0)
+		if(i%priv->group_type == 0)
 			out[j++] = ' ';
 	}
 	
@@ -245,22 +287,23 @@ gint format_ablock(GtkHex *gh, gchar *out, guint start, guint end) {
  * the block into x,y coordinates of the xdisp/adisp, respectively
  */
 static gint get_xcoords(GtkHex *gh, gint pos, gint *x, gint *y) {
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
 	gint cx, cy, spaces;
 	
-	if(gh->cpl == 0)
+	if(priv->cpl == 0)
 		return FALSE;
 	
-	cy = pos / gh->cpl;
-	cy -= gh->top_line;
+	cy = pos / priv->cpl;
+	cy -= priv->top_line;
 	if(cy < 0)
 		return FALSE;
 	
-	cx = 2*(pos % gh->cpl);
-	spaces = (pos % gh->cpl) / gh->group_type;
+	cx = 2*(pos % priv->cpl);
+	spaces = (pos % priv->cpl) / priv->group_type;
 	
-	cx *= gh->char_width;
-	cy *= gh->char_height;
-	spaces *= gh->char_width;
+	cx *= priv->char_width;
+	cy *= priv->char_height;
+	spaces *= priv->char_width;
 	*x = cx + spaces;
 	*y = cy;
 	
@@ -268,18 +311,19 @@ static gint get_xcoords(GtkHex *gh, gint pos, gint *x, gint *y) {
 }
 
 static gint get_acoords(GtkHex *gh, gint pos, gint *x, gint *y) {
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
 	gint cx, cy;
 	
-	if(gh->cpl == 0)
+	if(priv->cpl == 0)
 		return FALSE;
 
-	cy = pos / gh->cpl;
-	cy -= gh->top_line;
+	cy = pos / priv->cpl;
+	cy -= priv->top_line;
 	if(cy < 0)
 		return FALSE;
-	cy *= gh->char_height;
+	cy *= priv->char_height;
 	
-	cx = gh->char_width*(pos % gh->cpl);
+	cx = priv->char_width*(pos % priv->cpl);
 	
 	*x = cx;
 	*y = cy;
@@ -290,31 +334,33 @@ static gint get_acoords(GtkHex *gh, gint pos, gint *x, gint *y) {
 static void
 invalidate_xc (GtkHex *gh)
 {
-    GtkWidget *widget = gh->xdisp;
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
+    GtkWidget *widget = priv->xdisp;
     gint cx, cy;
 
-    if (get_xcoords (gh, gh->cursor_pos, &cx, &cy)) {
-        if (gh->lower_nibble)
-            cx += gh->char_width;
+    if (get_xcoords (gh, priv->cursor_pos, &cx, &cy)) {
+        if (priv->lower_nibble)
+            cx += priv->char_width;
 
         gtk_widget_queue_draw_area (widget,
                                     cx, cy,
-                                    gh->char_width + 1,
-                                    gh->char_height);
+                                    priv->char_width + 1,
+                                    priv->char_height);
     }
 }
 
 static void
 invalidate_ac (GtkHex *gh)
 {
-    GtkWidget *widget = gh->adisp;
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
+    GtkWidget *widget = priv->adisp;
     gint cx, cy;
 
-    if (get_acoords (gh, gh->cursor_pos, &cx, &cy)) {
+    if (get_acoords (gh, priv->cursor_pos, &cx, &cy)) {
         gtk_widget_queue_draw_area (widget,
                                     cx, cy,
-                                    gh->char_width + 1,
-                                    gh->char_height);
+                                    priv->char_width + 1,
+                                    priv->char_height);
     }
 }
 
@@ -325,42 +371,43 @@ static void
 render_ac (GtkHex *gh,
            cairo_t *cr)
 {
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
 	GdkRGBA fg_color;
 	GtkStateFlags state;
 	GtkStyleContext *context;
 	gint cx, cy;
 	static gchar c[2] = "\0\0";
 
-	if(!gtk_widget_get_realized(gh->adisp))
+	if(!gtk_widget_get_realized(priv->adisp))
 		return;
 
-	context = gtk_widget_get_style_context (gh->adisp);
-	state = gtk_widget_get_state_flags (gh->adisp);
+	context = gtk_widget_get_style_context (priv->adisp);
+	state = gtk_widget_get_state_flags (priv->adisp);
 
-	if(get_acoords(gh, gh->cursor_pos, &cx, &cy)) {
-		c[0] = gtk_hex_get_byte(gh, gh->cursor_pos);
+	if(get_acoords(gh, priv->cursor_pos, &cx, &cy)) {
+		c[0] = gtk_hex_get_byte(gh, priv->cursor_pos);
 		if(!is_displayable(c[0]))
 			c[0] = '.';
 
-		if(gh->active_view == VIEW_ASCII) {
-			gtk_widget_set_state_flags (gh->adisp, GTK_STATE_FLAG_SELECTED, FALSE);
-			context = gtk_widget_get_style_context (gh->adisp);
-			state = gtk_widget_get_state_flags (gh->adisp);
+		if(priv->active_view == VIEW_ASCII) {
+			gtk_widget_set_state_flags (priv->adisp, GTK_STATE_FLAG_SELECTED, FALSE);
+			context = gtk_widget_get_style_context (priv->adisp);
+			state = gtk_widget_get_state_flags (priv->adisp);
 			gtk_render_background (context, cr, cx, cy,
-								   gh->char_width, gh->char_height - 1);
+								   priv->char_width, priv->char_height - 1);
 			gtk_style_context_get_color (context, state, &fg_color);
-			gtk_widget_unset_state_flags (gh->adisp, GTK_STATE_FLAG_SELECTED);
+			gtk_widget_unset_state_flags (priv->adisp, GTK_STATE_FLAG_SELECTED);
 		} else {
 			gtk_style_context_get_color (context, state, &fg_color);
 			gdk_cairo_set_source_rgba (cr, &fg_color);
 			cairo_set_line_width (cr, 1.0);
-			cairo_rectangle (cr, cx + 0.5, cy + 0.5, gh->char_width, gh->char_height - 1);
+			cairo_rectangle (cr, cx + 0.5, cy + 0.5, priv->char_width, priv->char_height - 1);
 			cairo_stroke (cr);
 		}
 		gdk_cairo_set_source_rgba (cr, &fg_color);
 		cairo_move_to (cr, cx, cy);
-		pango_layout_set_text (gh->alayout, (char *) c, 1);
-		pango_cairo_show_layout (cr, gh->alayout);
+		pango_layout_set_text (priv->alayout, (char *) c, 1);
+		pango_cairo_show_layout (cr, priv->alayout);
 	}
 }
 
@@ -368,68 +415,71 @@ static void
 render_xc (GtkHex *gh,
            cairo_t *cr)
 {
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
 	GdkRGBA fg_color;
 	GtkStateFlags state;
 	GtkStyleContext *context;
 	gint cx, cy, i;
 	static gchar c[2];
 
-	if(!gtk_widget_get_realized(gh->xdisp))
+	if(!gtk_widget_get_realized(priv->xdisp))
 		return;
 
-	context = gtk_widget_get_style_context (gh->xdisp);
-	state = gtk_widget_get_state_flags (gh->xdisp);
+	context = gtk_widget_get_style_context (priv->xdisp);
+	state = gtk_widget_get_state_flags (priv->xdisp);
 
-	if(get_xcoords(gh, gh->cursor_pos, &cx, &cy)) {
-		format_xbyte(gh, gh->cursor_pos, c);
-		if(gh->lower_nibble) {
-			cx += gh->char_width;
+	if(get_xcoords(gh, priv->cursor_pos, &cx, &cy)) {
+		format_xbyte(gh, priv->cursor_pos, c);
+		if(priv->lower_nibble) {
+			cx += priv->char_width;
 			i = 1;
 		} else {
 			c[1] = 0;
 			i = 0;
 		}
 
-		if(gh->active_view == VIEW_HEX) {
-			gtk_widget_set_state_flags (gh->xdisp, GTK_STATE_FLAG_SELECTED, FALSE);
-			context = gtk_widget_get_style_context (gh->xdisp);
-			state = gtk_widget_get_state_flags (gh->xdisp);
+		if(priv->active_view == VIEW_HEX) {
+			gtk_widget_set_state_flags (priv->xdisp, GTK_STATE_FLAG_SELECTED, FALSE);
+			context = gtk_widget_get_style_context (priv->xdisp);
+			state = gtk_widget_get_state_flags (priv->xdisp);
 			gtk_render_background (context, cr, cx, cy,
-								   gh->char_width, gh->char_height - 1);
+								   priv->char_width, priv->char_height - 1);
 			gtk_style_context_get_color (context, state, &fg_color);
-			gtk_widget_unset_state_flags (gh->xdisp, GTK_STATE_FLAG_SELECTED);
-			context = gtk_widget_get_style_context (gh->xdisp);
+			gtk_widget_unset_state_flags (priv->xdisp, GTK_STATE_FLAG_SELECTED);
+			context = gtk_widget_get_style_context (priv->xdisp);
 		} else {
 			gtk_style_context_get_color (context, state, &fg_color);
 			gdk_cairo_set_source_rgba (cr, &fg_color);
 			cairo_set_line_width (cr, 1.0);
-			cairo_rectangle (cr, cx + 0.5, cy + 0.5, gh->char_width, gh->char_height - 1);
+			cairo_rectangle (cr, cx + 0.5, cy + 0.5, priv->char_width, priv->char_height - 1);
 			cairo_stroke (cr);
 		}
 		gdk_cairo_set_source_rgba (cr, &fg_color);
 		cairo_move_to (cr, cx, cy);
-		pango_layout_set_text (gh->xlayout, &c[i], 1);
-		pango_cairo_show_layout (cr, gh->xlayout);
+		pango_layout_set_text (priv->xlayout, &c[i], 1);
+		pango_cairo_show_layout (cr, priv->xlayout);
 	}
 }
 
 static void show_cursor(GtkHex *gh) {
-	if(!gh->cursor_shown) {
-		if (gtk_widget_get_realized (gh->xdisp) || gtk_widget_get_realized (gh->adisp)) {
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
+	if(!priv->cursor_shown) {
+		if (gtk_widget_get_realized (priv->xdisp) || gtk_widget_get_realized (priv->adisp)) {
 			invalidate_xc (gh);
 			invalidate_ac (gh);
 		}
-		gh->cursor_shown = TRUE;
+		priv->cursor_shown = TRUE;
 	}
 }
 
 static void hide_cursor(GtkHex *gh) {
-	if(gh->cursor_shown) {
-		if (gtk_widget_get_realized (gh->xdisp) || gtk_widget_get_realized (gh->adisp)) {
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
+	if(priv->cursor_shown) {
+		if (gtk_widget_get_realized (priv->xdisp) || gtk_widget_get_realized (priv->adisp)) {
 			invalidate_xc (gh);
 			invalidate_ac (gh);
 		}
-		gh->cursor_shown = FALSE;
+		priv->cursor_shown = FALSE;
 	}
 }
 
@@ -461,13 +511,14 @@ render_hex_highlights (GtkHex *gh,
                        cairo_t *cr,
                        gint cursor_line)
 {
-	GtkHex_Highlight *curHighlight = &gh->selection;
-	gint xcpl = gh->cpl*2 + gh->cpl/gh->group_type;
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
+	GtkHex_Highlight *curHighlight = &priv->selection;
+	gint xcpl = priv->cpl*2 + priv->cpl/priv->group_type;
 	   /* would be nice if we could cache that */
 
-	GtkHex_AutoHighlight *nextList = gh->auto_highlight;
+	GtkHex_AutoHighlight *nextList = priv->auto_highlight;
 
-	gtk_widget_set_state_flags (gh->xdisp, GTK_STATE_FLAG_SELECTED, FALSE);
+	gtk_widget_set_state_flags (priv->xdisp, GTK_STATE_FLAG_SELECTED, FALSE);
 
 	cairo_save (cr);
 
@@ -488,41 +539,41 @@ render_hex_highlights (GtkHex *gh,
 			sl = curHighlight->start_line;
 			el = curHighlight->end_line;
 
-			get_highlight_colour (gh->xdisp, curHighlight, &bg_color);
+			get_highlight_colour (priv->xdisp, curHighlight, &bg_color);
 			gdk_cairo_set_source_rgba (cr, &bg_color);
 
 			if (cursor_line == sl)
 			{
-				cursor_off = 2*(start%gh->cpl) + (start%gh->cpl)/gh->group_type;
+				cursor_off = 2*(start%priv->cpl) + (start%priv->cpl)/priv->group_type;
 				if (cursor_line == el)
-					len = 2*(end%gh->cpl + 1) + (end%gh->cpl)/gh->group_type;
+					len = 2*(end%priv->cpl + 1) + (end%priv->cpl)/priv->group_type;
 				else
 					len = xcpl;
 				len = len - cursor_off;
 				if (len > 0)
 					cairo_rectangle (cr,
-									 cursor_off * gh->char_width,
-									 cursor_line * gh->char_height,
-									 len * gh->char_width,
-									 gh->char_height);
+									 cursor_off * priv->char_width,
+									 cursor_line * priv->char_height,
+									 len * priv->char_width,
+									 priv->char_height);
 			}
 			else if (cursor_line == el)
 			{
-				cursor_off = 2*(end%gh->cpl + 1) + (end%gh->cpl)/gh->group_type;
+				cursor_off = 2*(end%priv->cpl + 1) + (end%priv->cpl)/priv->group_type;
 				if (cursor_off > 0)
 					cairo_rectangle (cr,
 									 0,
-									 cursor_line * gh->char_height,
-									 cursor_off * gh->char_width,
-									 gh->char_height);
+									 cursor_line * priv->char_height,
+									 cursor_off * priv->char_width,
+									 priv->char_height);
 			}
 			else if (cursor_line > sl && cursor_line < el)
 			{
 				cairo_rectangle (cr,
 								 0,
-								 cursor_line * gh->char_height,
-								 xcpl * gh->char_width,
-								 gh->char_height);
+								 cursor_line * priv->char_height,
+								 xcpl * priv->char_width,
+								 priv->char_height);
 			}
 
 			cairo_fill (cr);
@@ -536,7 +587,7 @@ render_hex_highlights (GtkHex *gh,
 	}
 
 	cairo_restore (cr);
-	gtk_widget_unset_state_flags (gh->xdisp, GTK_STATE_FLAG_SELECTED);
+	gtk_widget_unset_state_flags (priv->xdisp, GTK_STATE_FLAG_SELECTED);
 }
 
 static void
@@ -544,10 +595,11 @@ render_ascii_highlights (GtkHex *gh,
                          cairo_t *cr,
                          gint cursor_line)
 {
-	GtkHex_Highlight *curHighlight = &gh->selection;
-	GtkHex_AutoHighlight *nextList = gh->auto_highlight;
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
+	GtkHex_Highlight *curHighlight = &priv->selection;
+	GtkHex_AutoHighlight *nextList = priv->auto_highlight;
 
-	gtk_widget_set_state_flags (gh->adisp, GTK_STATE_FLAG_SELECTED, FALSE);
+	gtk_widget_set_state_flags (priv->adisp, GTK_STATE_FLAG_SELECTED, FALSE);
 
 	cairo_save (cr);
 
@@ -568,40 +620,40 @@ render_ascii_highlights (GtkHex *gh,
 			sl = curHighlight->start_line;
 			el = curHighlight->end_line;
 
-			get_highlight_colour (gh->adisp, curHighlight, &bg_color);
+			get_highlight_colour (priv->adisp, curHighlight, &bg_color);
 			gdk_cairo_set_source_rgba (cr, &bg_color);
 
 			if (cursor_line == sl)
 			{
-				cursor_off = start % gh->cpl;
+				cursor_off = start % priv->cpl;
 				if (cursor_line == el)
 					len = end - start + 1;
 				else
-					len = gh->cpl - cursor_off;
+					len = priv->cpl - cursor_off;
 				if (len > 0)
 					cairo_rectangle (cr,
-									 cursor_off * gh->char_width,
-									 cursor_line * gh->char_height,
-									 len * gh->char_width,
-									 gh->char_height);
+									 cursor_off * priv->char_width,
+									 cursor_line * priv->char_height,
+									 len * priv->char_width,
+									 priv->char_height);
 			}
 			else if (cursor_line == el)
 			{
-				cursor_off = end % gh->cpl + 1;
+				cursor_off = end % priv->cpl + 1;
 				if (cursor_off > 0)
 					cairo_rectangle (cr,
 									 0,
-									 cursor_line * gh->char_height,
-									 cursor_off * gh->char_width,
-									 gh->char_height);
+									 cursor_line * priv->char_height,
+									 cursor_off * priv->char_width,
+									 priv->char_height);
 			}
 			else if (cursor_line > sl && cursor_line < el)
 			{
 				cairo_rectangle (cr,
 								 0,
-								 cursor_line * gh->char_height,
-								 gh->cpl * gh->char_width,
-								 gh->char_height);
+								 cursor_line * priv->char_height,
+								 priv->cpl * priv->char_width,
+								 priv->char_height);
 			}
 
 			cairo_fill (cr);
@@ -615,13 +667,13 @@ render_ascii_highlights (GtkHex *gh,
 	}
 
 	cairo_restore (cr);
-	gtk_widget_unset_state_flags (gh->adisp, GTK_STATE_FLAG_SELECTED);
+	gtk_widget_unset_state_flags (priv->adisp, GTK_STATE_FLAG_SELECTED);
 }
 
 /*
  * when calling invalidate_*_lines() the imin and imax arguments are the
  * numbers of the first and last line TO BE INVALIDATED in the range
- * [0 .. gh->vis_lines-1] AND NOT [0 .. gh->lines]!
+ * [0 .. priv->vis_lines-1] AND NOT [0 .. priv->lines]!
  */
 static void
 invalidate_lines (GtkHex *gh,
@@ -629,14 +681,15 @@ invalidate_lines (GtkHex *gh,
                   gint imin,
                   gint imax)
 {
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
     GtkAllocation allocation;
 
     gtk_widget_get_allocation (widget, &allocation);
     gtk_widget_queue_draw_area (widget,
                                 0,
-                                imin * gh->char_height,
+                                imin * priv->char_height,
                                 allocation.width,
-                                (imax - imin + 1) * gh->char_height);
+                                (imax - imin + 1) * priv->char_height);
 }
 
 static void
@@ -644,7 +697,8 @@ invalidate_hex_lines (GtkHex *gh,
                       gint imin,
                       gint imax)
 {
-    invalidate_lines (gh, gh->xdisp, imin, imax);
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
+    invalidate_lines (gh, priv->xdisp, imin, imax);
 }
 
 static void
@@ -652,7 +706,8 @@ invalidate_ascii_lines (GtkHex *gh,
                         gint imin,
                         gint imax)
 {
-    invalidate_lines (gh, gh->adisp, imin, imax);
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
+    invalidate_lines (gh, priv->adisp, imin, imax);
 }
 
 static void
@@ -660,13 +715,14 @@ invalidate_offsets (GtkHex *gh,
                     gint imin,
                     gint imax)
 {
-    invalidate_lines (gh, gh->offsets, imin, imax);
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
+    invalidate_lines (gh, priv->offsets, imin, imax);
 }
 
 /*
  * when calling render_*_lines() the imin and imax arguments are the
  * numbers of the first and last line TO BE DISPLAYED in the range
- * [0 .. gh->vis_lines-1] AND NOT [0 .. gh->lines]!
+ * [0 .. priv->vis_lines-1] AND NOT [0 .. priv->lines]!
  */
 static void
 render_hex_lines (GtkHex *gh,
@@ -674,16 +730,17 @@ render_hex_lines (GtkHex *gh,
                   gint imin,
                   gint imax)
 {
-	GtkWidget *w = gh->xdisp;
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
+	GtkWidget *w = priv->xdisp;
 	GdkRGBA fg_color;
 	GtkAllocation allocation;
 	GtkStateFlags state;
 	GtkStyleContext *context;
 	gint i, cursor_line;
-	gint xcpl = gh->cpl*2 + gh->cpl/gh->group_type;
+	gint xcpl = priv->cpl*2 + priv->cpl/priv->group_type;
 	gint frm_len, tmp;
 
-	if( (!gtk_widget_get_realized(GTK_WIDGET (gh))) || (gh->cpl == 0) )
+	if( (!gtk_widget_get_realized(GTK_WIDGET (gh))) || (priv->cpl == 0) )
 		return;
 
 	context = gtk_widget_get_style_context (w);
@@ -691,21 +748,21 @@ render_hex_lines (GtkHex *gh,
 
 	gtk_style_context_get_color (context, state, &fg_color);
 
-	cursor_line = gh->cursor_pos / gh->cpl - gh->top_line;
+	cursor_line = priv->cursor_pos / priv->cpl - priv->top_line;
 
 	gtk_widget_get_allocation(w, &allocation);
 	gtk_render_background (context, cr,
-						   0, imin * gh->char_height,
-						   allocation.width, (imax - imin + 1) * gh->char_height);
+						   0, imin * priv->char_height,
+						   allocation.width, (imax - imin + 1) * priv->char_height);
 	cairo_fill (cr);
   
-	imax = MIN(imax, gh->vis_lines);
-	imax = MIN(imax, gh->lines);
+	imax = MIN(imax, priv->vis_lines);
+	imax = MIN(imax, priv->lines);
 
 	gdk_cairo_set_source_rgba (cr, &fg_color);
 
-	frm_len = format_xblock (gh, (gchar *) gh->priv->disp_buffer, (gh->top_line+imin)*gh->cpl,
-							MIN((gh->top_line+imax+1)*gh->cpl, gh->document->file_size) );
+	frm_len = format_xblock (gh, (gchar *) priv->disp_buffer, (priv->top_line+imin)*priv->cpl,
+							MIN((priv->top_line+imax+1)*priv->cpl, priv->document->file_size) );
 	
 	for(i = imin; i <= imax; i++) {
 		tmp = (gint)frm_len - (gint)((i - imin)*xcpl);
@@ -713,12 +770,12 @@ render_hex_lines (GtkHex *gh,
 			break;
 
 		render_hex_highlights (gh, cr, i);
-		cairo_move_to (cr, 0, i * gh->char_height);
-		pango_layout_set_text (gh->xlayout, (char *) gh->priv->disp_buffer + (i - imin) * xcpl, MIN(xcpl, tmp));
-		pango_cairo_show_layout (cr, gh->xlayout);
+		cairo_move_to (cr, 0, i * priv->char_height);
+		pango_layout_set_text (priv->xlayout, (char *) priv->disp_buffer + (i - imin) * xcpl, MIN(xcpl, tmp));
+		pango_cairo_show_layout (cr, priv->xlayout);
 	}
 	
-	if((cursor_line >= imin) && (cursor_line <= imax) && (gh->cursor_shown))
+	if((cursor_line >= imin) && (cursor_line <= imax) && (priv->cursor_shown))
 		render_xc (gh, cr);
 }
 
@@ -728,7 +785,8 @@ render_ascii_lines (GtkHex *gh,
                     gint imin,
                     gint imax)
 {
-	GtkWidget *w = gh->adisp;
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
+	GtkWidget *w = priv->adisp;
 	GdkRGBA fg_color;
 	GtkAllocation allocation;
 	GtkStateFlags state;
@@ -736,7 +794,7 @@ render_ascii_lines (GtkHex *gh,
 	gint i, tmp, frm_len;
 	guint cursor_line;
 
-	if( (!gtk_widget_get_realized(GTK_WIDGET(gh))) || (gh->cpl == 0) )
+	if( (!gtk_widget_get_realized(GTK_WIDGET(gh))) || (priv->cpl == 0) )
 		return;
 
 	context = gtk_widget_get_style_context (w);
@@ -744,35 +802,35 @@ render_ascii_lines (GtkHex *gh,
 
 	gtk_style_context_get_color (context, state, &fg_color);
 
-	cursor_line = gh->cursor_pos / gh->cpl - gh->top_line;
+	cursor_line = priv->cursor_pos / priv->cpl - priv->top_line;
 
 	gtk_widget_get_allocation(w, &allocation);
 	gtk_render_background (context, cr,
-						   0, imin * gh->char_height,
-						   allocation.width, (imax - imin + 1) * gh->char_height);
+						   0, imin * priv->char_height,
+						   allocation.width, (imax - imin + 1) * priv->char_height);
 	cairo_fill (cr);
 	
-	imax = MIN(imax, gh->vis_lines);
-	imax = MIN(imax, gh->lines);
+	imax = MIN(imax, priv->vis_lines);
+	imax = MIN(imax, priv->lines);
 
 	gdk_cairo_set_source_rgba (cr, &fg_color);
 	
-	frm_len = format_ablock (gh, (gchar *) gh->priv->disp_buffer, (gh->top_line+imin)*gh->cpl,
-							MIN((gh->top_line+imax+1)*gh->cpl, gh->document->file_size) );
+	frm_len = format_ablock (gh, (gchar *) priv->disp_buffer, (priv->top_line+imin)*priv->cpl,
+							MIN((priv->top_line+imax+1)*priv->cpl, priv->document->file_size) );
 	
 	for(i = imin; i <= imax; i++) {
-		tmp = (gint)frm_len - (gint)((i - imin)*gh->cpl);
+		tmp = (gint)frm_len - (gint)((i - imin)*priv->cpl);
 		if(tmp <= 0)
 			break;
 
 		render_ascii_highlights (gh, cr, i);
 
-		cairo_move_to (cr, 0, i * gh->char_height);
-		pango_layout_set_text (gh->alayout, (gchar *) gh->priv->disp_buffer + (i - imin)*gh->cpl, MIN(gh->cpl, tmp));
-		pango_cairo_show_layout (cr, gh->alayout);
+		cairo_move_to (cr, 0, i * priv->char_height);
+		pango_layout_set_text (priv->alayout, (gchar *) priv->disp_buffer + (i - imin)*priv->cpl, MIN(priv->cpl, tmp));
+		pango_cairo_show_layout (cr, priv->alayout);
 	}
 	
-	if((cursor_line >= imin) && (cursor_line <= imax) && (gh->cursor_shown))
+	if((cursor_line >= imin) && (cursor_line <= imax) && (priv->cursor_shown))
 		render_ac (gh, cr);
 }
 
@@ -782,7 +840,8 @@ render_offsets (GtkHex *gh,
                 gint imin,
                 gint imax)
 {
-	GtkWidget *w = gh->offsets;
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
+	GtkWidget *w = priv->offsets;
 	GdkRGBA fg_color;
 	GtkAllocation allocation;
 	GtkStateFlags state;
@@ -800,20 +859,20 @@ render_offsets (GtkHex *gh,
 
 	gtk_widget_get_allocation(w, &allocation);
 	gtk_render_background (context, cr, 0,
-						   imin * gh->char_height,
-						   allocation.width, (imax - imin + 1) * gh->char_height);
+						   imin * priv->char_height,
+						   allocation.width, (imax - imin + 1) * priv->char_height);
 	cairo_fill (cr);
   
-	imax = MIN(imax, gh->vis_lines);
-	imax = MIN(imax, gh->lines - gh->top_line - 1);
+	imax = MIN(imax, priv->vis_lines);
+	imax = MIN(imax, priv->lines - priv->top_line - 1);
 
 	gdk_cairo_set_source_rgba (cr, &fg_color);
 	
 	for(i = imin; i <= imax; i++) {
-		sprintf(offstr, "%08X", (gh->top_line + i)*gh->cpl + gh->starting_offset);
-		cairo_move_to (cr, 0, i * gh->char_height);
-		pango_layout_set_text (gh->olayout, offstr, 8);
-		pango_cairo_show_layout (cr, gh->olayout);
+		sprintf(offstr, "%08X", (priv->top_line + i)*priv->cpl + priv->starting_offset);
+		cairo_move_to (cr, 0, i * priv->char_height);
+		pango_layout_set_text (priv->olayout, offstr, 8);
+		pango_cairo_show_layout (cr, priv->olayout);
 	}
 }
 
@@ -825,17 +884,18 @@ hex_draw (GtkWidget *w,
           cairo_t *cr,
           GtkHex *gh)
 {
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
 	GdkRectangle rect;
 	gint imin, imax;
 
 	gdk_cairo_get_clip_rectangle (cr, &rect);
 
-	imin = (rect.y) / gh->char_height;
-	imax = (rect.y + rect.height) / gh->char_height;
-	if ((rect.y + rect.height) % gh->char_height)
+	imin = (rect.y) / priv->char_height;
+	imax = (rect.y + rect.height) / priv->char_height;
+	if ((rect.y + rect.height) % priv->char_height)
 		imax++;
 
-	imax = MIN(imax, gh->vis_lines);
+	imax = MIN(imax, priv->vis_lines);
 	
 	render_hex_lines (gh, cr, imin, imax);
 }
@@ -845,17 +905,18 @@ ascii_draw (GtkWidget *w,
             cairo_t *cr,
             GtkHex *gh)
 {
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
 	GdkRectangle rect;
 	gint imin, imax;
 
 	gdk_cairo_get_clip_rectangle (cr, &rect);
 
-	imin = (rect.y) / gh->char_height;
-	imax = (rect.y + rect.height) / gh->char_height;
-	if ((rect.y + rect.height) % gh->char_height)
+	imin = (rect.y) / priv->char_height;
+	imax = (rect.y + rect.height) / priv->char_height;
+	if ((rect.y + rect.height) % priv->char_height)
 		imax++;
 	
-	imax = MIN(imax, gh->vis_lines);
+	imax = MIN(imax, priv->vis_lines);
 
 	render_ascii_lines (gh, cr, imin, imax);
 }
@@ -865,17 +926,18 @@ offsets_draw (GtkWidget *w,
               cairo_t *cr,
               GtkHex *gh)
 {
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
 	GdkRectangle rect;
 	gint imin, imax;
 
 	gdk_cairo_get_clip_rectangle (cr, &rect);
 
-	imin = (rect.y) / gh->char_height;
-	imax = (rect.y + rect.height) / gh->char_height;
-	if ((rect.y + rect.height) % gh->char_height)
+	imin = (rect.y) / priv->char_height;
+	imax = (rect.y + rect.height) / priv->char_height;
+	if ((rect.y + rect.height) % priv->char_height)
 		imax++;
 
-	imax = MIN(imax, gh->vis_lines);
+	imax = MIN(imax, priv->vis_lines);
 	
 	render_offsets (gh, cr, imin, imax);
 }
@@ -888,6 +950,7 @@ draw_shadow (GtkWidget *widget,
              cairo_t *cr)
 {
 	GtkHex *gh = GTK_HEX(widget);
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
 	GtkAllocation allocation;
 	GtkBorder padding;
 	GtkStateFlags state;
@@ -902,30 +965,30 @@ draw_shadow (GtkWidget *widget,
 
 	x = border;
 	gtk_widget_get_allocation(widget, &allocation);
-	if(gh->show_offsets) {
+	if(priv->show_offsets) {
 		gtk_render_frame (context,
 		                  cr,
 		                  border,
 		                  border,
-		                  8 * gh->char_width + padding.left + padding.right,
+		                  8 * priv->char_width + padding.left + padding.right,
 		                  allocation.height - 2 * border);
-		x += 8 * gh->char_width + padding.left + padding.right + gh->extra_width/2;
+		x += 8 * priv->char_width + padding.left + padding.right + priv->extra_width/2;
 	}
 
 	gtk_render_frame (context,
 	                  cr,
 	                  x,
 	                  border,
-	                  gh->xdisp_width + padding.left + padding.right,
+	                  priv->xdisp_width + padding.left + padding.right,
 	                  allocation.height - 2 * border);
 
 	/* Draw a frame around the ascii display + scrollbar */
-	gtk_widget_get_preferred_width (gh->scrollbar, NULL, &sb_width);
+	gtk_widget_get_preferred_width (priv->scrollbar, NULL, &sb_width);
 	gtk_render_frame (context,
 	                  cr,
-	                  allocation.width - border - gh->adisp_width - sb_width - padding.left - padding.right,
+	                  allocation.width - border - priv->adisp_width - sb_width - padding.left - padding.right,
 	                  border,
-	                  gh->adisp_width + sb_width + padding.left + padding.right,
+	                  priv->adisp_width + sb_width + padding.left + padding.right,
 	                  allocation.height - 2 * border);
 }
 
@@ -934,11 +997,12 @@ draw_shadow (GtkWidget *widget,
  * lines we can display according to the current size of the widget
  */
 static void recalc_displays(GtkHex *gh, guint width, guint height) {
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
 	gboolean scroll_to_cursor;
 	gdouble value;
 	gint total_width = width;
 	gint total_cpl, xcpl;
-	gint old_cpl = gh->cpl;
+	gint old_cpl = priv->cpl;
 	GtkBorder padding;
 	GtkStateFlags state;
 	GtkStyleContext *context;
@@ -952,88 +1016,88 @@ static void recalc_displays(GtkHex *gh, guint width, guint height) {
 	 * Only change the value of the adjustment to put the cursor on screen
 	 * if the cursor is currently within the displayed portion.
 	 */
-	scroll_to_cursor = (gh->cpl == 0) ||
-	                   ((gh->cursor_pos / gh->cpl >= gtk_adjustment_get_value (gh->adj)) &&
-	                    (gh->cursor_pos / gh->cpl <= gtk_adjustment_get_value (gh->adj) + gh->vis_lines - 1));
+	scroll_to_cursor = (priv->cpl == 0) ||
+	                   ((priv->cursor_pos / priv->cpl >= gtk_adjustment_get_value (priv->adj)) &&
+	                    (priv->cursor_pos / priv->cpl <= gtk_adjustment_get_value (priv->adj) + priv->vis_lines - 1));
 
-	gtk_widget_get_preferred_size (gh->scrollbar, &req, NULL);
+	gtk_widget_get_preferred_size (priv->scrollbar, &req, NULL);
 	
-	gh->xdisp_width = 1;
-	gh->adisp_width = 1;
+	priv->xdisp_width = 1;
+	priv->adisp_width = 1;
 
 	total_width -= 2*gtk_container_get_border_width(GTK_CONTAINER(gh)) +
 	               2 * padding.left + 2 * padding.right + req.width;
 
-	if(gh->show_offsets)
-		total_width -= padding.left + padding.right + 8 * gh->char_width;
+	if(priv->show_offsets)
+		total_width -= padding.left + padding.right + 8 * priv->char_width;
 
-	total_cpl = total_width / gh->char_width;
+	total_cpl = total_width / priv->char_width;
 
 	if((total_cpl == 0) || (total_width < 0)) {
-		gh->cpl = gh->lines = gh->vis_lines = 0;
+		priv->cpl = priv->lines = priv->vis_lines = 0;
 		return;
 	}
 	
 	/* calculate how many bytes we can stuff in one line */
-	gh->cpl = 0;
+	priv->cpl = 0;
 	do {
-		if(gh->cpl % gh->group_type == 0 && total_cpl < gh->group_type*3)
+		if(priv->cpl % priv->group_type == 0 && total_cpl < priv->group_type*3)
 			break;
 		
-		gh->cpl++;        /* just added one more char */
+		priv->cpl++;        /* just added one more char */
 		total_cpl -= 3;   /* 2 for xdisp, 1 for adisp */
 		
-		if(gh->cpl % gh->group_type == 0) /* just ended a group */
+		if(priv->cpl % priv->group_type == 0) /* just ended a group */
 			total_cpl--;
 	} while(total_cpl > 0);
 
-	if(gh->cpl == 0)
+	if(priv->cpl == 0)
 		return;
 
-	if(gh->document->file_size == 0)
-		gh->lines = 1;
+	if(priv->document->file_size == 0)
+		priv->lines = 1;
 	else {
-		gh->lines = gh->document->file_size / gh->cpl;
-		if(gh->document->file_size % gh->cpl)
-			gh->lines++;
+		priv->lines = priv->document->file_size / priv->cpl;
+		if(priv->document->file_size % priv->cpl)
+			priv->lines++;
 	}
 
-	gh->vis_lines = ((gint) (height - 2 * gtk_container_get_border_width (GTK_CONTAINER (gh)) - padding.top - padding.bottom)) / ((gint) gh->char_height);
+	priv->vis_lines = ((gint) (height - 2 * gtk_container_get_border_width (GTK_CONTAINER (gh)) - padding.top - padding.bottom)) / ((gint) priv->char_height);
 
-	gh->adisp_width = gh->cpl*gh->char_width;
-	xcpl = gh->cpl*2 + (gh->cpl - 1)/gh->group_type;
-	gh->xdisp_width = xcpl*gh->char_width;
+	priv->adisp_width = priv->cpl*priv->char_width;
+	xcpl = priv->cpl*2 + (priv->cpl - 1)/priv->group_type;
+	priv->xdisp_width = xcpl*priv->char_width;
 
-	gh->extra_width = total_width - gh->xdisp_width - gh->adisp_width;
+	priv->extra_width = total_width - priv->xdisp_width - priv->adisp_width;
 
-	if (gh->priv->disp_buffer)
-		g_free (gh->priv->disp_buffer);
+	if (priv->disp_buffer)
+		g_free (priv->disp_buffer);
 	
-	gh->priv->disp_buffer = g_malloc ((xcpl + 1) * (gh->vis_lines + 1));
+	priv->disp_buffer = g_malloc ((xcpl + 1) * (priv->vis_lines + 1));
 
 	/* calculate new display position */
-	value = MIN (gh->top_line * old_cpl / gh->cpl, gh->lines - gh->vis_lines);
+	value = MIN (priv->top_line * old_cpl / priv->cpl, priv->lines - priv->vis_lines);
 	value = MAX (0, value);
 
 	/* keep cursor on screen if it was on screen before */
 	if (scroll_to_cursor &&
-	    ((gh->cursor_pos / gh->cpl < value) ||
-	     (gh->cursor_pos / gh->cpl > value + gh->vis_lines - 1))) {
-		value = MIN (gh->cursor_pos / gh->cpl, gh->lines - gh->vis_lines);
+	    ((priv->cursor_pos / priv->cpl < value) ||
+	     (priv->cursor_pos / priv->cpl > value + priv->vis_lines - 1))) {
+		value = MIN (priv->cursor_pos / priv->cpl, priv->lines - priv->vis_lines);
 		value = MAX (0, value);
 	}
 
 	/* adjust the scrollbar and display position to new values */
-	gtk_adjustment_configure (gh->adj,
+	gtk_adjustment_configure (priv->adj,
 	                          value,             /* value */
 	                          0,                 /* lower */
-	                          gh->lines,         /* upper */
+	                          priv->lines,         /* upper */
 	                          1,                 /* step increment */
-	                          gh->vis_lines - 1, /* page increment */
-	                          gh->vis_lines      /* page size */);
+	                          priv->vis_lines - 1, /* page increment */
+	                          priv->vis_lines      /* page size */);
 
-	g_signal_emit_by_name(G_OBJECT(gh->adj), "changed");
-	g_signal_emit_by_name(G_OBJECT(gh->adj), "value_changed");
+	g_signal_emit_by_name(G_OBJECT(priv->adj), "changed");
+	g_signal_emit_by_name(G_OBJECT(priv->adj), "value_changed");
 }
 
 /*
@@ -1041,22 +1105,23 @@ static void recalc_displays(GtkHex *gh, guint width, guint height) {
  * connected to value_changed signal of scrollbar's GtkAdjustment
  */
 static void display_scrolled(GtkAdjustment *adj, GtkHex *gh) {
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
 	gint dx;
 	gint dy;
 
-	if ((!gtk_widget_is_drawable(gh->xdisp)) ||
-	    (!gtk_widget_is_drawable(gh->adisp)))
+	if ((!gtk_widget_is_drawable(priv->xdisp)) ||
+	    (!gtk_widget_is_drawable(priv->adisp)))
 		return;
 
 	dx = 0;
-	dy = (gh->top_line - (gint)gtk_adjustment_get_value (adj)) * gh->char_height;
+	dy = (priv->top_line - (gint)gtk_adjustment_get_value (adj)) * priv->char_height;
 
-	gh->top_line = (gint)gtk_adjustment_get_value(adj);
+	priv->top_line = (gint)gtk_adjustment_get_value(adj);
 
-	gdk_window_scroll (gtk_widget_get_window (gh->xdisp), dx, dy);
-	gdk_window_scroll (gtk_widget_get_window (gh->adisp), dx, dy);
-	if (gh->offsets)
-		gdk_window_scroll (gtk_widget_get_window (gh->offsets), dx, dy);
+	gdk_window_scroll (gtk_widget_get_window (priv->xdisp), dx, dy);
+	gdk_window_scroll (gtk_widget_get_window (priv->adisp), dx, dy);
+	if (priv->offsets)
+		gdk_window_scroll (gtk_widget_get_window (priv->offsets), dx, dy);
 
 	gtk_hex_update_all_auto_highlights(gh, TRUE, TRUE);
 	gtk_hex_invalidate_all_highlights(gh);
@@ -1066,29 +1131,32 @@ static void display_scrolled(GtkAdjustment *adj, GtkHex *gh) {
  * mouse signal handlers (button 1 and motion) for both displays
  */
 static gboolean scroll_timeout_handler(GtkHex *gh) {
-	if(gh->scroll_dir < 0)
-		gtk_hex_set_cursor(gh, MAX(0, (int)(gh->cursor_pos - gh->cpl)));
-	else if(gh->scroll_dir > 0)
-		gtk_hex_set_cursor(gh, MIN(gh->document->file_size - 1,
-								   gh->cursor_pos + gh->cpl));
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
+	if(priv->scroll_dir < 0)
+		gtk_hex_set_cursor(gh, MAX(0, (int)(priv->cursor_pos - priv->cpl)));
+	else if(priv->scroll_dir > 0)
+		gtk_hex_set_cursor(gh, MIN(priv->document->file_size - 1,
+								   priv->cursor_pos + priv->cpl));
 	return TRUE;
 }
 
 static void hex_scroll_cb(GtkWidget *w, GdkEventScroll *event, GtkHex *gh) {
-	gtk_widget_event(gh->scrollbar, (GdkEvent *)event);
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
+	gtk_widget_event(priv->scrollbar, (GdkEvent *)event);
 }
 
 static void hex_button_cb(GtkWidget *w, GdkEventButton *event, GtkHex *gh) {
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
 	if( (event->type == GDK_BUTTON_RELEASE) &&
 		(event->button == GDK_BUTTON_PRIMARY) ) {
-		if(gh->scroll_timeout != -1) {
-			g_source_remove(gh->scroll_timeout);
-			gh->scroll_timeout = -1;
-			gh->scroll_dir = 0;
+		if(priv->scroll_timeout != -1) {
+			g_source_remove(priv->scroll_timeout);
+			priv->scroll_timeout = -1;
+			priv->scroll_dir = 0;
 		}
-		gh->selecting = FALSE;
+		priv->selecting = FALSE;
 		gtk_grab_remove(w);
-		gh->button = 0;
+		priv->button = 0;
 	}
 	else if((event->type == GDK_BUTTON_PRESS) && (event->button == GDK_BUTTON_PRIMARY)) {
 		if (!gtk_widget_has_focus (GTK_WIDGET (gh)))
@@ -1096,19 +1164,19 @@ static void hex_button_cb(GtkWidget *w, GdkEventButton *event, GtkHex *gh) {
 		
 		gtk_grab_add(w);
 
-		gh->button = event->button;
+		priv->button = event->button;
 		
-		if(gh->active_view == VIEW_HEX) {
+		if(priv->active_view == VIEW_HEX) {
 			hex_to_pointer(gh, event->x, event->y);
 
-			if(!gh->selecting) {
-				gh->selecting = TRUE;
-				gtk_hex_set_selection(gh, gh->cursor_pos, gh->cursor_pos);
+			if(!priv->selecting) {
+				priv->selecting = TRUE;
+				gtk_hex_set_selection(gh, priv->cursor_pos, priv->cursor_pos);
 			}
 		}
 		else {
 			hide_cursor(gh);
-			gh->active_view = VIEW_HEX;
+			priv->active_view = VIEW_HEX;
 			show_cursor(gh);
 			hex_button_cb(w, event, gh);
 		}
@@ -1117,23 +1185,24 @@ static void hex_button_cb(GtkWidget *w, GdkEventButton *event, GtkHex *gh) {
 		GtkHexClass *klass = GTK_HEX_CLASS(GTK_WIDGET_GET_CLASS(gh));
 		gchar *text;
 
-		gh->active_view = VIEW_HEX;
+		priv->active_view = VIEW_HEX;
 		hex_to_pointer(gh, event->x, event->y);
 
 		text = gtk_clipboard_wait_for_text(klass->primary);
 		if(text) {
-			hex_document_set_data(gh->document, gh->cursor_pos,
+			hex_document_set_data(priv->document, priv->cursor_pos,
 								  strlen(text), 0, (guchar *)  text, TRUE);
-			gtk_hex_set_cursor(gh, gh->cursor_pos + strlen(text));
+			gtk_hex_set_cursor(gh, priv->cursor_pos + strlen(text));
 			g_free(text);
 		}
-		gh->button = 0;
+		priv->button = 0;
 	}
 	else
-		gh->button = 0;
+		priv->button = 0;
 }
 
 static void hex_motion_cb(GtkWidget *w, GdkEventMotion *event, GtkHex *gh) {
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
 	GtkAllocation  allocation;
 	GdkSeat       *seat;
 	GdkDevice     *pointer;
@@ -1146,66 +1215,68 @@ static void hex_motion_cb(GtkWidget *w, GdkEventMotion *event, GtkHex *gh) {
 	gdk_window_get_device_position (gtk_widget_get_window (w), pointer, &x, &y, NULL);
 
 	if(y < 0)
-		gh->scroll_dir = -1;
+		priv->scroll_dir = -1;
 	else if(y >= allocation.height)
-		gh->scroll_dir = 1;
+		priv->scroll_dir = 1;
 	else
-		gh->scroll_dir = 0;
+		priv->scroll_dir = 0;
 
-	if(gh->scroll_dir != 0) {
-		if(gh->scroll_timeout == -1)
-			gh->scroll_timeout =
+	if(priv->scroll_dir != 0) {
+		if(priv->scroll_timeout == -1)
+			priv->scroll_timeout =
 				g_timeout_add(SCROLL_TIMEOUT,
 							  (GSourceFunc)scroll_timeout_handler, gh);
 		return;
 	}
 	else {
-		if(gh->scroll_timeout != -1) {
-			g_source_remove(gh->scroll_timeout);
-			gh->scroll_timeout = -1;
+		if(priv->scroll_timeout != -1) {
+			g_source_remove(priv->scroll_timeout);
+			priv->scroll_timeout = -1;
 		}
 	}
 			
 	if(event->window != gtk_widget_get_window(w))
 		return;
 
-	if((gh->active_view == VIEW_HEX) && (gh->button == 1)) {
+	if((priv->active_view == VIEW_HEX) && (priv->button == 1)) {
 		hex_to_pointer(gh, x, y);
 	}
 }
 
 static void ascii_scroll_cb(GtkWidget *w, GdkEventScroll *event, GtkHex *gh) {
-	gtk_widget_event(gh->scrollbar, (GdkEvent *)event);
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
+	gtk_widget_event(priv->scrollbar, (GdkEvent *)event);
 }
 
 static void ascii_button_cb(GtkWidget *w, GdkEventButton *event, GtkHex *gh) {
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
 	if( (event->type == GDK_BUTTON_RELEASE) &&
 		(event->button == GDK_BUTTON_PRIMARY) ) {
-		if(gh->scroll_timeout != -1) {
-			g_source_remove(gh->scroll_timeout);
-			gh->scroll_timeout = -1;
-			gh->scroll_dir = 0;
+		if(priv->scroll_timeout != -1) {
+			g_source_remove(priv->scroll_timeout);
+			priv->scroll_timeout = -1;
+			priv->scroll_dir = 0;
 		}
-		gh->selecting = FALSE;
+		priv->selecting = FALSE;
 		gtk_grab_remove(w);
-		gh->button = 0;
+		priv->button = 0;
 	}
 	else if( (event->type == GDK_BUTTON_PRESS) && (event->button == GDK_BUTTON_PRIMARY) ) {
 		if (!gtk_widget_has_focus (GTK_WIDGET (gh)))
 			gtk_widget_grab_focus (GTK_WIDGET(gh));
 		
 		gtk_grab_add(w);
-		gh->button = event->button;
-		if(gh->active_view == VIEW_ASCII) {
+		priv->button = event->button;
+		if(priv->active_view == VIEW_ASCII) {
 			ascii_to_pointer(gh, event->x, event->y);
-			if(!gh->selecting) {
-				gh->selecting = TRUE;
-				gtk_hex_set_selection(gh, gh->cursor_pos, gh->cursor_pos);
+			if(!priv->selecting) {
+				priv->selecting = TRUE;
+				gtk_hex_set_selection(gh, priv->cursor_pos, priv->cursor_pos);
 			}
 		}
 		else {
 			hide_cursor(gh);
-			gh->active_view = VIEW_ASCII;
+			priv->active_view = VIEW_ASCII;
 			show_cursor(gh);
 			ascii_button_cb(w, event, gh);
 		}
@@ -1214,23 +1285,24 @@ static void ascii_button_cb(GtkWidget *w, GdkEventButton *event, GtkHex *gh) {
 		GtkHexClass *klass = GTK_HEX_CLASS(GTK_WIDGET_GET_CLASS(gh));
 		gchar *text;
 
-		gh->active_view = VIEW_ASCII;
+		priv->active_view = VIEW_ASCII;
 		ascii_to_pointer(gh, event->x, event->y);
 
 		text = gtk_clipboard_wait_for_text(klass->primary);
 		if(text) {
-			hex_document_set_data(gh->document, gh->cursor_pos,
+			hex_document_set_data(priv->document, priv->cursor_pos,
 								  strlen(text), 0, (guchar *) text, TRUE);
-			gtk_hex_set_cursor(gh, gh->cursor_pos + strlen(text));
+			gtk_hex_set_cursor(gh, priv->cursor_pos + strlen(text));
 			g_free(text);
 		}
-		gh->button = 0;
+		priv->button = 0;
 	}
 	else
-		gh->button = 0;
+		priv->button = 0;
 }
 
 static void ascii_motion_cb(GtkWidget *w, GdkEventMotion *event, GtkHex *gh) {
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
 	GtkAllocation  allocation;
 	GdkSeat       *seat;
 	GdkDevice     *pointer;
@@ -1243,57 +1315,59 @@ static void ascii_motion_cb(GtkWidget *w, GdkEventMotion *event, GtkHex *gh) {
 	gdk_window_get_device_position (gtk_widget_get_window (w), pointer, &x, &y, NULL);
 
 	if(y < 0)
-		gh->scroll_dir = -1;
+		priv->scroll_dir = -1;
 	else if(y >= allocation.height)
-		gh->scroll_dir = 1;
+		priv->scroll_dir = 1;
 	else
-		gh->scroll_dir = 0;
+		priv->scroll_dir = 0;
 
-	if(gh->scroll_dir != 0) {
-		if(gh->scroll_timeout == -1)
-			gh->scroll_timeout =
+	if(priv->scroll_dir != 0) {
+		if(priv->scroll_timeout == -1)
+			priv->scroll_timeout =
 				g_timeout_add(SCROLL_TIMEOUT,
 							  (GSourceFunc)scroll_timeout_handler, gh);
 		return;
 	}
 	else {
-		if(gh->scroll_timeout != -1) {
-			g_source_remove(gh->scroll_timeout);
-			gh->scroll_timeout = -1;
+		if(priv->scroll_timeout != -1) {
+			g_source_remove(priv->scroll_timeout);
+			priv->scroll_timeout = -1;
 		}
 	}
 
 	if(event->window != gtk_widget_get_window(w))
 		return;
 
-	if((gh->active_view == VIEW_ASCII) && (gh->button == 1)) {
+	if((priv->active_view == VIEW_ASCII) && (priv->button == 1)) {
 		ascii_to_pointer(gh, x, y);
 	}
 }
 
 static void show_offsets_widget(GtkHex *gh) {
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
 	GtkStyleContext *context;
 
-	gh->offsets = gtk_drawing_area_new();
+	priv->offsets = gtk_drawing_area_new();
 
 	/* Create the pango layout for the widget */
-	gh->olayout = gtk_widget_create_pango_layout (gh->offsets, "");
+	priv->olayout = gtk_widget_create_pango_layout (priv->offsets, "");
 
-	gtk_widget_set_events (gh->offsets, GDK_EXPOSURE_MASK);
-	g_signal_connect (G_OBJECT(gh->offsets), "draw",
+	gtk_widget_set_events (priv->offsets, GDK_EXPOSURE_MASK);
+	g_signal_connect (G_OBJECT(priv->offsets), "draw",
 	                  G_CALLBACK (offsets_draw), gh);
 
-	context = gtk_widget_get_style_context (GTK_WIDGET (gh->xdisp));
+	context = gtk_widget_get_style_context (GTK_WIDGET (priv->xdisp));
 	gtk_style_context_add_class (context, GTK_STYLE_CLASS_HEADER);
 
-	gtk_fixed_put(GTK_FIXED(gh), gh->offsets, 0, 0);
-	gtk_widget_show(gh->offsets);
+	gtk_fixed_put(GTK_FIXED(gh), priv->offsets, 0, 0);
+	gtk_widget_show(priv->offsets);
 }
 
 static void hide_offsets_widget(GtkHex *gh) {
-	if(gh->offsets) {
-		gtk_container_remove(GTK_CONTAINER(gh), gh->offsets);
-		gh->offsets = NULL;
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
+	if(priv->offsets) {
+		gtk_container_remove(GTK_CONTAINER(gh), priv->offsets);
+		priv->offsets = NULL;
 	}
 }
 
@@ -1301,52 +1375,53 @@ static void hide_offsets_widget(GtkHex *gh) {
  * default data_changed signal handler
  */
 static void gtk_hex_real_data_changed(GtkHex *gh, gpointer data) {
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
 	HexChangeData *change_data = (HexChangeData *)data;
 	gint start_line, end_line;
 	guint lines;
 
-	if(gh->cpl == 0)
+	if(priv->cpl == 0)
 		return;
 
 	if(change_data->start - change_data->end + 1 != change_data->rep_len) {
-		lines = gh->document->file_size / gh->cpl;
-		if(gh->document->file_size % gh->cpl)
+		lines = priv->document->file_size / priv->cpl;
+		if(priv->document->file_size % priv->cpl)
 			lines++;
-		if(lines != gh->lines) {
-			gh->lines = lines;
-			gtk_adjustment_set_value(gh->adj, MIN(gtk_adjustment_get_value(gh->adj), gh->lines - gh->vis_lines));
-			gtk_adjustment_set_value(gh->adj, MAX(0, gtk_adjustment_get_value(gh->adj)));
-			if((gh->cursor_pos/gh->cpl < gtk_adjustment_get_value(gh->adj)) ||
-			   (gh->cursor_pos/gh->cpl > gtk_adjustment_get_value(gh->adj) + gh->vis_lines - 1)) {
-				gtk_adjustment_set_value(gh->adj, MIN(gh->cursor_pos/gh->cpl, gh->lines - gh->vis_lines));
-				gtk_adjustment_set_value(gh->adj, MAX(0, gtk_adjustment_get_value(gh->adj)));
+		if(lines != priv->lines) {
+			priv->lines = lines;
+			gtk_adjustment_set_value(priv->adj, MIN(gtk_adjustment_get_value(priv->adj), priv->lines - priv->vis_lines));
+			gtk_adjustment_set_value(priv->adj, MAX(0, gtk_adjustment_get_value(priv->adj)));
+			if((priv->cursor_pos/priv->cpl < gtk_adjustment_get_value(priv->adj)) ||
+			   (priv->cursor_pos/priv->cpl > gtk_adjustment_get_value(priv->adj) + priv->vis_lines - 1)) {
+				gtk_adjustment_set_value(priv->adj, MIN(priv->cursor_pos/priv->cpl, priv->lines - priv->vis_lines));
+				gtk_adjustment_set_value(priv->adj, MAX(0, gtk_adjustment_get_value(priv->adj)));
 			}
-			gtk_adjustment_set_lower(gh->adj, 0);
-			gtk_adjustment_set_upper(gh->adj, gh->lines);
-			gtk_adjustment_set_step_increment(gh->adj, 1);
-			gtk_adjustment_set_page_increment(gh->adj, gh->vis_lines - 1);
-			gtk_adjustment_set_page_size(gh->adj, gh->vis_lines);
-			g_signal_emit_by_name(G_OBJECT(gh->adj), "changed");
-			g_signal_emit_by_name(G_OBJECT(gh->adj), "value_changed");
+			gtk_adjustment_set_lower(priv->adj, 0);
+			gtk_adjustment_set_upper(priv->adj, priv->lines);
+			gtk_adjustment_set_step_increment(priv->adj, 1);
+			gtk_adjustment_set_page_increment(priv->adj, priv->vis_lines - 1);
+			gtk_adjustment_set_page_size(priv->adj, priv->vis_lines);
+			g_signal_emit_by_name(G_OBJECT(priv->adj), "changed");
+			g_signal_emit_by_name(G_OBJECT(priv->adj), "value_changed");
 		}
 	}
 
-	start_line = change_data->start/gh->cpl - gh->top_line;
-	end_line = change_data->end/gh->cpl - gh->top_line;
+	start_line = change_data->start/priv->cpl - priv->top_line;
+	end_line = change_data->end/priv->cpl - priv->top_line;
 
 	if(end_line < 0 ||
-	   start_line > gh->vis_lines)
+	   start_line > priv->vis_lines)
 		return;
 
 	start_line = MAX(start_line, 0);
 	if(change_data->rep_len - change_data->end + change_data->start - 1 != 0)
-		end_line = gh->vis_lines;
+		end_line = priv->vis_lines;
 	else
-		end_line = MIN(end_line, gh->vis_lines);
+		end_line = MIN(end_line, priv->vis_lines);
 
     invalidate_hex_lines (gh, start_line, end_line);
     invalidate_ascii_lines (gh, start_line, end_line);
-    if (gh->show_offsets)
+    if (priv->show_offsets)
     {
         invalidate_offsets (gh, start_line, end_line);
     }
@@ -1354,18 +1429,19 @@ static void gtk_hex_real_data_changed(GtkHex *gh, gpointer data) {
 
 static void bytes_changed(GtkHex *gh, gint start, gint end)
 {
-	gint start_line = start/gh->cpl - gh->top_line;
-	gint end_line = end/gh->cpl - gh->top_line;
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
+	gint start_line = start/priv->cpl - priv->top_line;
+	gint end_line = end/priv->cpl - priv->top_line;
 
 	if(end_line < 0 ||
-	   start_line > gh->vis_lines)
+	   start_line > priv->vis_lines)
 		return;
 
 	start_line = MAX(start_line, 0);
 
     invalidate_hex_lines (gh, start_line, end_line);
     invalidate_ascii_lines (gh, start_line, end_line);
-    if (gh->show_offsets)
+    if (priv->show_offsets)
     {
         invalidate_offsets (gh, start_line, end_line);
     }
@@ -1375,15 +1451,16 @@ static void primary_get_cb(GtkClipboard *clipboard,
 						   GtkSelectionData *data, guint info,
 						   gpointer user_data) {
 	GtkHex *gh = GTK_HEX(user_data);
-	if(gh->selection.start != gh->selection.end) {
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
+	if(priv->selection.start != priv->selection.end) {
 		gint start_pos; 
 		gint end_pos;
 		guchar *text;
 
-		start_pos = MIN(gh->selection.start, gh->selection.end);
-		end_pos = MAX(gh->selection.start, gh->selection.end);
+		start_pos = MIN(priv->selection.start, priv->selection.end);
+		end_pos = MAX(priv->selection.start, priv->selection.end);
  
-		text = hex_document_get_data(gh->document, start_pos,
+		text = hex_document_get_data(priv->document, start_pos,
 									 end_pos - start_pos);
 		gtk_selection_data_set_text(data, (gchar *) text, end_pos - start_pos);
 		g_free(text);
@@ -1396,7 +1473,8 @@ static void primary_clear_cb(GtkClipboard *clipboard,
 
 void gtk_hex_set_selection(GtkHex *gh, gint start, gint end)
 {
-	gint length = gh->document->file_size;
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
+	gint length = priv->document->file_size;
 	gint oe, os, ne, ns;
 	GtkHexClass *klass = GTK_HEX_CLASS(GTK_WIDGET_GET_CLASS(gh));
 
@@ -1408,19 +1486,19 @@ void gtk_hex_set_selection(GtkHex *gh, gint start, gint end)
 	if (end < 0)
 		end = length;
 
-	if (gh->selection.start != gh->selection.end)
+	if (priv->selection.start != priv->selection.end)
 		gtk_clipboard_clear(klass->primary);
 
-	os = MIN(gh->selection.start, gh->selection.end);
-	oe = MAX(gh->selection.start, gh->selection.end);
+	os = MIN(priv->selection.start, priv->selection.end);
+	oe = MAX(priv->selection.start, priv->selection.end);
 
-	gh->selection.start = CLAMP(start, 0, length);
-	gh->selection.end = MIN(end, length);
+	priv->selection.start = CLAMP(start, 0, length);
+	priv->selection.end = MIN(end, length);
 
-	gtk_hex_invalidate_highlight(gh, &gh->selection);
+	gtk_hex_invalidate_highlight(gh, &priv->selection);
 
-	ns = MIN(gh->selection.start, gh->selection.end);
-	ne = MAX(gh->selection.start, gh->selection.end);
+	ns = MIN(priv->selection.start, priv->selection.end);
+	ne = MAX(priv->selection.start, priv->selection.end);
 
 	if(ns != os && ne != oe) {
 		bytes_changed(gh, MIN(ns, os), MAX(ne, oe));
@@ -1432,7 +1510,7 @@ void gtk_hex_set_selection(GtkHex *gh, gint start, gint end)
 		bytes_changed(gh, MIN(ns, os), MAX(ns, os));
 	}
 
-	if(gh->selection.start != gh->selection.end)
+	if(priv->selection.start != priv->selection.end)
 		gtk_clipboard_set_with_data(klass->primary, targets, n_targets,
 									primary_get_cb, primary_clear_cb,
 									gh);
@@ -1440,15 +1518,16 @@ void gtk_hex_set_selection(GtkHex *gh, gint start, gint end)
 
 gboolean gtk_hex_get_selection(GtkHex *gh, gint *start, gint *end)
 {
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
 	gint ss, se;
 
-	if(gh->selection.start > gh->selection.end) {
-		se = gh->selection.start;
-		ss = gh->selection.end;
+	if(priv->selection.start > priv->selection.end) {
+		se = priv->selection.start;
+		ss = priv->selection.end;
 	}
 	else {
-		ss = gh->selection.start;
-		se = gh->selection.end;
+		ss = priv->selection.start;
+		se = priv->selection.end;
 	}
 
 	if(NULL != start)
@@ -1466,27 +1545,29 @@ void gtk_hex_clear_selection(GtkHex *gh)
 
 void gtk_hex_delete_selection(GtkHex *gh)
 {
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
 	guint start;
 	guint end;
 
-	start = MIN(gh->selection.start, gh->selection.end);
-	end = MAX(gh->selection.start, gh->selection.end);
+	start = MIN(priv->selection.start, priv->selection.end);
+	end = MAX(priv->selection.start, priv->selection.end);
 
 	gtk_hex_set_selection(gh, 0, 0);
 
 	if(start != end) {
-		if(start < gh->cursor_pos)
-			gtk_hex_set_cursor(gh, gh->cursor_pos - end + start);
-		hex_document_delete_data(gh->document, MIN(start, end), end - start, TRUE);
+		if(start < priv->cursor_pos)
+			gtk_hex_set_cursor(gh, priv->cursor_pos - end + start);
+		hex_document_delete_data(priv->document, MIN(start, end), end - start, TRUE);
 	}
 }
 
 static void gtk_hex_validate_highlight(GtkHex *gh, GtkHex_Highlight *hl)
 {
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
 	if (!hl->valid)
 	{
-		hl->start_line = MIN(hl->start, hl->end) / gh->cpl - gh->top_line;
-		hl->end_line = MAX(hl->start, hl->end) / gh->cpl - gh->top_line;
+		hl->start_line = MIN(hl->start, hl->end) / priv->cpl - priv->top_line;
+		hl->end_line = MAX(hl->start, hl->end) / priv->cpl - priv->top_line;
 		hl->valid = TRUE;
 	}
 }
@@ -1498,8 +1579,9 @@ static void gtk_hex_invalidate_highlight(GtkHex *gh, GtkHex_Highlight *hl)
 
 static void gtk_hex_invalidate_all_highlights(GtkHex *gh)
 {
-	GtkHex_Highlight *cur = &gh->selection;
-	GtkHex_AutoHighlight *nextList = gh->auto_highlight;
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
+	GtkHex_Highlight *cur = &priv->selection;
+	GtkHex_AutoHighlight *nextList = priv->auto_highlight;
 	while (cur)
 	{
 		gtk_hex_invalidate_highlight(gh, cur);
@@ -1516,8 +1598,9 @@ static GtkHex_Highlight *gtk_hex_insert_highlight (GtkHex *gh,
 												   GtkHex_AutoHighlight *ahl,
 												   gint start, gint end)
 {
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
 	GdkRGBA rgba;
-	gint length = gh->document->file_size;
+	gint length = priv->document->file_size;
 
 	GtkHex_Highlight *new = g_malloc0(sizeof(GtkHex_Highlight));
 
@@ -1601,6 +1684,7 @@ static gboolean gtk_hex_find_limited(GtkHex *gh, gchar *find, int findlen,
 static void gtk_hex_update_auto_highlight(GtkHex *gh, GtkHex_AutoHighlight *ahl,
 										  gboolean delete, gboolean add)
 {
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
 	gint del_min, del_max;
 	gint add_min, add_max;
 	guint foundpos = -1;
@@ -1608,8 +1692,8 @@ static void gtk_hex_update_auto_highlight(GtkHex *gh, GtkHex_AutoHighlight *ahl,
 	gint prev_max = ahl->view_max;
 	GtkHex_Highlight *cur;
 
-	ahl->view_min = gh->top_line * gh->cpl;
-	ahl->view_max = (gh->top_line + gh->vis_lines) * gh->cpl;
+	ahl->view_min = priv->top_line * priv->cpl;
+	ahl->view_max = (priv->top_line + priv->vis_lines) * priv->cpl;
 
 	if (prev_min < ahl->view_min && prev_max < ahl->view_max)
 	{
@@ -1628,7 +1712,7 @@ static void gtk_hex_update_auto_highlight(GtkHex *gh, GtkHex_AutoHighlight *ahl,
 	else /* just refresh the lot */
 	{
 		del_min = 0;
-		del_max = gh->cpl * gh->lines;
+		del_max = priv->cpl * priv->lines;
 		add_min = ahl->view_min;
 		add_max = ahl->view_max;
 	}
@@ -1657,7 +1741,8 @@ static void gtk_hex_update_auto_highlight(GtkHex *gh, GtkHex_AutoHighlight *ahl,
 
 static void gtk_hex_update_all_auto_highlights(GtkHex *gh, gboolean delete, gboolean add)
 {
-	GtkHex_AutoHighlight *cur = gh->auto_highlight;
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
+	GtkHex_AutoHighlight *cur = priv->auto_highlight;
 	while (cur)
 	{
 		gtk_hex_update_auto_highlight(gh, cur, delete, add);
@@ -1682,15 +1767,16 @@ void gtk_hex_paste_from_clipboard(GtkHex *gh)
 
 static void gtk_hex_real_copy_to_clipboard(GtkHex *gh)
 {
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
 	gint start_pos; 
 	gint end_pos;
 	GtkHexClass *klass = GTK_HEX_CLASS(GTK_WIDGET_GET_CLASS(gh));
 
-	start_pos = MIN(gh->selection.start, gh->selection.end);
-	end_pos = MAX(gh->selection.start, gh->selection.end);
+	start_pos = MIN(priv->selection.start, priv->selection.end);
+	end_pos = MAX(priv->selection.start, priv->selection.end);
  
 	if(start_pos != end_pos) {
-		guchar *text = hex_document_get_data(gh->document, start_pos,
+		guchar *text = hex_document_get_data(priv->document, start_pos,
 											 end_pos - start_pos);
 		gtk_clipboard_set_text(klass->clipboard, (gchar *) text, end_pos - start_pos);
 		g_free(text);
@@ -1699,7 +1785,8 @@ static void gtk_hex_real_copy_to_clipboard(GtkHex *gh)
 
 static void gtk_hex_real_cut_to_clipboard(GtkHex *gh)
 {
-	if(gh->selection.start != -1 && gh->selection.end != -1) {
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
+	if(priv->selection.start != -1 && priv->selection.end != -1) {
 		gtk_hex_real_copy_to_clipboard(gh);
 		gtk_hex_delete_selection(gh);
 	}
@@ -1707,195 +1794,198 @@ static void gtk_hex_real_cut_to_clipboard(GtkHex *gh)
 
 static void gtk_hex_real_paste_from_clipboard(GtkHex *gh)
 {
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
 	GtkHexClass *klass = GTK_HEX_CLASS(GTK_WIDGET_GET_CLASS(gh));
 	gchar *text;
 
 	text = gtk_clipboard_wait_for_text(klass->clipboard);
 	if(text) {
-		hex_document_set_data(gh->document, gh->cursor_pos,
+		hex_document_set_data(priv->document, priv->cursor_pos,
 							  strlen(text), 0, (guchar *) text, TRUE);
-		gtk_hex_set_cursor(gh, gh->cursor_pos + strlen(text));
+		gtk_hex_set_cursor(gh, priv->cursor_pos + strlen(text));
 		g_free(text);
 	}
 }
 
 static void gtk_hex_finalize(GObject *o) {
 	GtkHex *gh = GTK_HEX(o);
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
 	
-	if (gh->priv->disp_buffer)
-		g_free (gh->priv->disp_buffer);
+	if (priv->disp_buffer)
+		g_free (priv->disp_buffer);
 
-	if (gh->disp_font_metrics)
-		pango_font_metrics_unref (gh->disp_font_metrics);
+	if (priv->disp_font_metrics)
+		pango_font_metrics_unref (priv->disp_font_metrics);
 
-	if (gh->font_desc)
-		pango_font_description_free (gh->font_desc);
+	if (priv->font_desc)
+		pango_font_description_free (priv->font_desc);
 
-	if (gh->xlayout)
-		g_object_unref (G_OBJECT (gh->xlayout));
+	if (priv->xlayout)
+		g_object_unref (G_OBJECT (priv->xlayout));
 	
-	if (gh->alayout)
-		g_object_unref (G_OBJECT (gh->alayout));
+	if (priv->alayout)
+		g_object_unref (G_OBJECT (priv->alayout));
 	
-	if (gh->olayout)
-		g_object_unref (G_OBJECT (gh->olayout));
+	if (priv->olayout)
+		g_object_unref (G_OBJECT (priv->olayout));
 	
 	/* Changes for Gnome 2.0 -- SnM */	
-	if(G_OBJECT_CLASS(parent_class)->finalize)
-		(* G_OBJECT_CLASS(parent_class)->finalize)(G_OBJECT(o));  
+	if (G_OBJECT_CLASS (gtk_hex_parent_class)->finalize)
+		(* G_OBJECT_CLASS (gtk_hex_parent_class)->finalize)(G_OBJECT(o));
 }
 
 static gboolean gtk_hex_key_press(GtkWidget *w, GdkEventKey *event) {
 	GtkHex *gh = GTK_HEX(w);
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
 	gint ret = TRUE;
 
 	hide_cursor(gh);
 
 	if(!(event->state & GDK_SHIFT_MASK)) {
-		gh->selecting = FALSE;
+		priv->selecting = FALSE;
 	}
 	else {
-		gh->selecting = TRUE;
+		priv->selecting = TRUE;
 	}
 	switch(event->keyval) {
 	case GDK_KEY_BackSpace:
-		if(gh->cursor_pos > 0) {
-			hex_document_set_data(gh->document, gh->cursor_pos - 1,
+		if(priv->cursor_pos > 0) {
+			hex_document_set_data(priv->document, priv->cursor_pos - 1,
 								  0, 1, NULL, TRUE);
-			if (gh->selecting)
-				gh->selecting = FALSE;
-			gtk_hex_set_cursor(gh, gh->cursor_pos - 1);
+			if (priv->selecting)
+				priv->selecting = FALSE;
+			gtk_hex_set_cursor(gh, priv->cursor_pos - 1);
 		}
 		break;
 	case GDK_KEY_Tab:
 	case GDK_KEY_KP_Tab:
-		if (gh->active_view == VIEW_ASCII) {
-			gh->active_view = VIEW_HEX;
+		if (priv->active_view == VIEW_ASCII) {
+			priv->active_view = VIEW_HEX;
 		}
 		else {
-			gh->active_view = VIEW_ASCII;
+			priv->active_view = VIEW_ASCII;
 		}
 		break;
 	case GDK_KEY_Delete:
-		if(gh->cursor_pos < gh->document->file_size) {
-			hex_document_set_data(gh->document, gh->cursor_pos,
+		if(priv->cursor_pos < priv->document->file_size) {
+			hex_document_set_data(priv->document, priv->cursor_pos,
 								  0, 1, NULL, TRUE);
-			gtk_hex_set_cursor(gh, gh->cursor_pos);
+			gtk_hex_set_cursor(gh, priv->cursor_pos);
 		}
 		break;
 	case GDK_KEY_Up:
-		gtk_hex_set_cursor(gh, gh->cursor_pos - gh->cpl);
+		gtk_hex_set_cursor(gh, priv->cursor_pos - priv->cpl);
 		break;
 	case GDK_KEY_Down:
-		gtk_hex_set_cursor(gh, gh->cursor_pos + gh->cpl);
+		gtk_hex_set_cursor(gh, priv->cursor_pos + priv->cpl);
 		break;
 	case GDK_KEY_Page_Up:
-		gtk_hex_set_cursor(gh, MAX(0, (gint)gh->cursor_pos - gh->vis_lines*gh->cpl));
+		gtk_hex_set_cursor(gh, MAX(0, (gint)priv->cursor_pos - priv->vis_lines*priv->cpl));
 		break;
 	case GDK_KEY_Page_Down:
-		gtk_hex_set_cursor(gh, MIN((gint)gh->document->file_size, (gint)gh->cursor_pos + gh->vis_lines*gh->cpl));
+		gtk_hex_set_cursor(gh, MIN((gint)priv->document->file_size, (gint)priv->cursor_pos + priv->vis_lines*priv->cpl));
 		break;
 	default:
 		if (event->state & GDK_MOD1_MASK) {
 			show_cursor(gh);
 			return FALSE;
 		}
-		if(gh->active_view == VIEW_HEX)
+		if(priv->active_view == VIEW_HEX)
 			switch(event->keyval) {
 			case GDK_KEY_Left:
 				if(!(event->state & GDK_SHIFT_MASK)) {
-					gh->lower_nibble = !gh->lower_nibble;
-					if(gh->lower_nibble)
-						gtk_hex_set_cursor(gh, gh->cursor_pos - 1);
+					priv->lower_nibble = !priv->lower_nibble;
+					if(priv->lower_nibble)
+						gtk_hex_set_cursor(gh, priv->cursor_pos - 1);
 				}
 				else {
-					gtk_hex_set_cursor(gh, gh->cursor_pos - 1);
+					gtk_hex_set_cursor(gh, priv->cursor_pos - 1);
 				}
 				break;
 			case GDK_KEY_Right:
-				if(gh->cursor_pos >= gh->document->file_size)
+				if(priv->cursor_pos >= priv->document->file_size)
 					break;
 				if(!(event->state & GDK_SHIFT_MASK)) {
-					gh->lower_nibble = !gh->lower_nibble;
-					if(!gh->lower_nibble)
-						gtk_hex_set_cursor(gh, gh->cursor_pos + 1);
+					priv->lower_nibble = !priv->lower_nibble;
+					if(!priv->lower_nibble)
+						gtk_hex_set_cursor(gh, priv->cursor_pos + 1);
 				}
 				else {
-					gtk_hex_set_cursor(gh, gh->cursor_pos + 1);
+					gtk_hex_set_cursor(gh, priv->cursor_pos + 1);
 				}
 				break;
 			default:
 				if(event->length != 1)
 					ret = FALSE;
 				else if((event->keyval >= '0')&&(event->keyval <= '9')) {
-					hex_document_set_nibble(gh->document, event->keyval - '0',
-											gh->cursor_pos, gh->lower_nibble,
-											gh->insert, TRUE);
-					if (gh->selecting)
-						gh->selecting = FALSE;
-					gh->lower_nibble = !gh->lower_nibble;
-					if(!gh->lower_nibble)
-						gtk_hex_set_cursor(gh, gh->cursor_pos + 1);
+					hex_document_set_nibble(priv->document, event->keyval - '0',
+											priv->cursor_pos, priv->lower_nibble,
+											priv->insert, TRUE);
+					if (priv->selecting)
+						priv->selecting = FALSE;
+					priv->lower_nibble = !priv->lower_nibble;
+					if(!priv->lower_nibble)
+						gtk_hex_set_cursor(gh, priv->cursor_pos + 1);
 				}
 				else if((event->keyval >= 'A')&&(event->keyval <= 'F')) {
-					hex_document_set_nibble(gh->document, event->keyval - 'A' + 10,
-											gh->cursor_pos, gh->lower_nibble,
-											gh->insert, TRUE);
-					if (gh->selecting)
-						gh->selecting = FALSE;
-					gh->lower_nibble = !gh->lower_nibble;
-					if(!gh->lower_nibble)
-						gtk_hex_set_cursor(gh, gh->cursor_pos + 1);
+					hex_document_set_nibble(priv->document, event->keyval - 'A' + 10,
+											priv->cursor_pos, priv->lower_nibble,
+											priv->insert, TRUE);
+					if (priv->selecting)
+						priv->selecting = FALSE;
+					priv->lower_nibble = !priv->lower_nibble;
+					if(!priv->lower_nibble)
+						gtk_hex_set_cursor(gh, priv->cursor_pos + 1);
 				}
 				else if((event->keyval >= 'a')&&(event->keyval <= 'f')) {
-					hex_document_set_nibble(gh->document, event->keyval - 'a' + 10,
-											gh->cursor_pos, gh->lower_nibble,
-											gh->insert, TRUE);
-					if (gh->selecting)
-						gh->selecting = FALSE;
-					gh->lower_nibble = !gh->lower_nibble;
-					if(!gh->lower_nibble)
-						gtk_hex_set_cursor(gh, gh->cursor_pos + 1);
+					hex_document_set_nibble(priv->document, event->keyval - 'a' + 10,
+											priv->cursor_pos, priv->lower_nibble,
+											priv->insert, TRUE);
+					if (priv->selecting)
+						priv->selecting = FALSE;
+					priv->lower_nibble = !priv->lower_nibble;
+					if(!priv->lower_nibble)
+						gtk_hex_set_cursor(gh, priv->cursor_pos + 1);
 				}
 				else if((event->keyval >= GDK_KEY_KP_0)&&(event->keyval <= GDK_KEY_KP_9)) {
-					hex_document_set_nibble(gh->document, event->keyval - GDK_KEY_KP_0,
-											gh->cursor_pos, gh->lower_nibble,
-											gh->insert, TRUE);
-					if (gh->selecting)
-						gh->selecting = FALSE;
-					gh->lower_nibble = !gh->lower_nibble;
-					if(!gh->lower_nibble)
-						gtk_hex_set_cursor(gh, gh->cursor_pos + 1);
+					hex_document_set_nibble(priv->document, event->keyval - GDK_KEY_KP_0,
+											priv->cursor_pos, priv->lower_nibble,
+											priv->insert, TRUE);
+					if (priv->selecting)
+						priv->selecting = FALSE;
+					priv->lower_nibble = !priv->lower_nibble;
+					if(!priv->lower_nibble)
+						gtk_hex_set_cursor(gh, priv->cursor_pos + 1);
 				}
 				else
 					ret = FALSE;
 
 				break;      
 			}
-		else if(gh->active_view == VIEW_ASCII)
+		else if(priv->active_view == VIEW_ASCII)
 			switch(event->keyval) {
 			case GDK_KEY_Left:
-				gtk_hex_set_cursor(gh, gh->cursor_pos - 1);
+				gtk_hex_set_cursor(gh, priv->cursor_pos - 1);
 				break;
 			case GDK_KEY_Right:
-				gtk_hex_set_cursor(gh, gh->cursor_pos + 1);
+				gtk_hex_set_cursor(gh, priv->cursor_pos + 1);
 				break;
 			default:
 				if(event->length != 1)
 					ret = FALSE;
 				else if(is_displayable(event->keyval)) {
-					hex_document_set_byte(gh->document, event->keyval,
-										  gh->cursor_pos, gh->insert, TRUE);
-					if (gh->selecting)
-						gh->selecting = FALSE;
-					gtk_hex_set_cursor(gh, gh->cursor_pos + 1);
+					hex_document_set_byte(priv->document, event->keyval,
+										  priv->cursor_pos, priv->insert, TRUE);
+					if (priv->selecting)
+						priv->selecting = FALSE;
+					gtk_hex_set_cursor(gh, priv->cursor_pos + 1);
 				}
 				else if((event->keyval >= GDK_KEY_KP_0)&&(event->keyval <= GDK_KEY_KP_9)) {
-					hex_document_set_byte(gh->document, event->keyval - GDK_KEY_KP_0 + '0',
-											gh->cursor_pos, gh->insert, TRUE);
-					if (gh->selecting)
-						gh->selecting = FALSE;
-					gtk_hex_set_cursor(gh, gh->cursor_pos + 1);
+					hex_document_set_byte(priv->document, event->keyval - GDK_KEY_KP_0 + '0',
+											priv->cursor_pos, priv->insert, TRUE);
+					if (priv->selecting)
+						priv->selecting = FALSE;
+					gtk_hex_set_cursor(gh, priv->cursor_pos + 1);
 				}
 				else
 					ret = FALSE;
@@ -1912,9 +2002,10 @@ static gboolean gtk_hex_key_press(GtkWidget *w, GdkEventKey *event) {
 
 static gboolean gtk_hex_key_release(GtkWidget *w, GdkEventKey *event) {
 	GtkHex *gh = GTK_HEX(w);
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
 
 	if (event->keyval == GDK_KEY_Shift_L || event->keyval == GDK_KEY_Shift_R) {
-		gh->selecting = FALSE;
+		priv->selecting = FALSE;
 	}
 
 	return TRUE;
@@ -1922,9 +2013,10 @@ static gboolean gtk_hex_key_release(GtkWidget *w, GdkEventKey *event) {
 
 static gboolean gtk_hex_button_release(GtkWidget *w, GdkEventButton *event) {
 	GtkHex *gh = GTK_HEX(w);
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
 
 	if(event->state & GDK_SHIFT_MASK) {
-		gh->selecting = FALSE;
+		priv->selecting = FALSE;
 	}
 
 	return TRUE;
@@ -1945,6 +2037,7 @@ static void gtk_hex_size_allocate(GtkWidget *w, GtkAllocation *alloc) {
 	gint sb_width;
 
 	gh = GTK_HEX(w);
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
 	hide_cursor(gh);
 	
 	recalc_displays(gh, alloc->width, alloc->height);
@@ -1966,27 +2059,27 @@ static void gtk_hex_size_allocate(GtkWidget *w, GtkAllocation *alloc) {
 	my_alloc.x = border_width + padding.left;
 	my_alloc.y = border_width + padding.top;
 	my_alloc.height = MAX (alloc->height - 2 * border_width - padding.top - padding.bottom, 1);
-	if(gh->show_offsets) {
-		my_alloc.width = 8*gh->char_width;
-		gtk_widget_size_allocate(gh->offsets, &my_alloc);
-		gtk_widget_queue_draw(gh->offsets);
-		my_alloc.x += padding.left + padding.right + my_alloc.width + gh->extra_width/2;
+	if(priv->show_offsets) {
+		my_alloc.width = 8*priv->char_width;
+		gtk_widget_size_allocate(priv->offsets, &my_alloc);
+		gtk_widget_queue_draw(priv->offsets);
+		my_alloc.x += padding.left + padding.right + my_alloc.width + priv->extra_width/2;
 	}
 
-	gtk_widget_get_preferred_width (gh->scrollbar, NULL, &sb_width);
+	gtk_widget_get_preferred_width (priv->scrollbar, NULL, &sb_width);
 
-	my_alloc.width = gh->xdisp_width;
-	gtk_widget_size_allocate(gh->xdisp, &my_alloc);
+	my_alloc.width = priv->xdisp_width;
+	gtk_widget_size_allocate(priv->xdisp, &my_alloc);
 	my_alloc.x = alloc->width - border_width - sb_width;
 	my_alloc.y = border_width;
 	my_alloc.width = sb_width;
 	my_alloc.height = MAX(alloc->height - 2*border_width, 1);
-	gtk_widget_size_allocate(gh->scrollbar, &my_alloc);
-	my_alloc.x -= gh->adisp_width + padding.left;
+	gtk_widget_size_allocate(priv->scrollbar, &my_alloc);
+	my_alloc.x -= priv->adisp_width + padding.left;
 	my_alloc.y = border_width + padding.top;
-	my_alloc.width = gh->adisp_width;
+	my_alloc.width = priv->adisp_width;
 	my_alloc.height = MAX (alloc->height - 2 * border_width - padding.top - padding.bottom, 1);
-	gtk_widget_size_allocate(gh->adisp, &my_alloc);
+	gtk_widget_size_allocate(priv->adisp, &my_alloc);
 	
 	show_cursor(gh);
 }
@@ -1995,8 +2088,8 @@ static gboolean
 gtk_hex_draw (GtkWidget *w,
               cairo_t *cr)
 {
-	if (GTK_WIDGET_CLASS (parent_class)->draw)
-		(* GTK_WIDGET_CLASS (parent_class)->draw) (w, cr);
+	if (GTK_WIDGET_CLASS (gtk_hex_parent_class)->draw)
+		(* GTK_WIDGET_CLASS (gtk_hex_parent_class)->draw) (w, cr);
 
 	draw_shadow (w, cr);
 
@@ -2013,6 +2106,7 @@ static void gtk_hex_document_changed(HexDocument* doc, gpointer change_data,
 static void gtk_hex_size_request(GtkWidget *w, GtkRequisition *req) {
 	GtkBorder padding;
 	GtkHex *gh = GTK_HEX(w);
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
 	GtkStateFlags state;
 	GtkStyleContext *context;
 	gint sb_width;
@@ -2021,13 +2115,13 @@ static void gtk_hex_size_request(GtkWidget *w, GtkRequisition *req) {
 	state = gtk_widget_get_state_flags (w);
 	gtk_style_context_get_padding (context, state, &padding);
 
-	gtk_widget_get_preferred_width (gh->scrollbar, NULL, &sb_width);
+	gtk_widget_get_preferred_width (priv->scrollbar, NULL, &sb_width);
 	req->width = 2 * padding.left + 2 * padding.right + 2 * gtk_container_get_border_width (GTK_CONTAINER (w)) +
-		sb_width + gh->char_width * (gh->priv->default_cpl + (gh->priv->default_cpl - 1) /
-										 gh->group_type);
-	if(gh->show_offsets)
-		req->width += padding.left + padding.right + 8 * gh->char_width;
-	req->height = gh->priv->default_lines * gh->char_height + padding.top + padding.bottom +
+		sb_width + priv->char_width * (priv->default_cpl + (priv->default_cpl - 1) /
+										 priv->group_type);
+	if(priv->show_offsets)
+		req->width += padding.left + padding.right + 8 * priv->char_width;
+	req->height = priv->default_lines * priv->char_height + padding.top + padding.bottom +
 		2*gtk_container_get_border_width(GTK_CONTAINER(w));
 }
 
@@ -2055,13 +2149,13 @@ gtk_hex_get_preferred_height (GtkWidget *widget,
     *minimal_height = *natural_height = requisition.height;
 }
 
-static void gtk_hex_class_init(GtkHexClass *klass, gpointer data) {
+static void
+gtk_hex_class_init(GtkHexClass *klass)
+{
 	GObjectClass *object_class = G_OBJECT_CLASS (klass);
 	GtkWidgetClass *widget_class = GTK_WIDGET_CLASS (klass);
 
-	parent_class = g_type_class_peek_parent(klass);
-	
-	gtkhex_signals[CURSOR_MOVED_SIGNAL] = 
+	gtkhex_signals[CURSOR_MOVED_SIGNAL] =
 		g_signal_new ("cursor_moved",
 					  G_TYPE_FROM_CLASS (widget_class),
 					  G_SIGNAL_RUN_FIRST,
@@ -2118,59 +2212,57 @@ static void gtk_hex_class_init(GtkHexClass *klass, gpointer data) {
 	gtk_widget_class_set_css_name (GTK_WIDGET_CLASS(klass), "hex-editor");
 
 	object_class->finalize = gtk_hex_finalize;
-
-	parent_class = g_type_class_ref (gtk_fixed_get_type ());
-
-	g_type_class_add_private (object_class, sizeof (GtkHexPrivate));
 }
 
-static void gtk_hex_init(GtkHex *gh, gpointer klass) {
+static void
+gtk_hex_init (GtkHex *gh)
+{
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
 	GtkCssProvider *provider;
 	GtkStyleContext *context;
 
 	context = gtk_widget_get_style_context (GTK_WIDGET (gh));
 
-	gh->priv = GTKHEX_GET_PRIVATE (gh);
-	gh->priv->disp_buffer = NULL;
-	gh->priv->default_cpl = DEFAULT_CPL;
-	gh->priv->default_lines = DEFAULT_LINES;
+	priv->disp_buffer = NULL;
+	priv->default_cpl = DEFAULT_CPL;
+	priv->default_lines = DEFAULT_LINES;
 
-	gh->scroll_timeout = -1;
+	priv->scroll_timeout = -1;
 
-	gh->document = NULL;
-	gh->starting_offset = 0;
+	priv->document = NULL;
+	priv->starting_offset = 0;
 
-	gh->xdisp_width = gh->adisp_width = 200;
-	gh->extra_width = 0;
-	gh->active_view = VIEW_HEX;
-	gh->group_type = GROUP_BYTE;
-	gh->lines = gh->vis_lines = gh->top_line = gh->cpl = 0;
-	gh->cursor_pos = 0;
-	gh->lower_nibble = FALSE;
-	gh->cursor_shown = FALSE;
-	gh->button = 0;
-	gh->insert = FALSE; /* default to overwrite mode */
-	gh->selecting = FALSE;
+	priv->xdisp_width = priv->adisp_width = 200;
+	priv->extra_width = 0;
+	priv->active_view = VIEW_HEX;
+	priv->group_type = GROUP_BYTE;
+	priv->lines = priv->vis_lines = priv->top_line = priv->cpl = 0;
+	priv->cursor_pos = 0;
+	priv->lower_nibble = FALSE;
+	priv->cursor_shown = FALSE;
+	priv->button = 0;
+	priv->insert = FALSE; /* default to overwrite mode */
+	priv->selecting = FALSE;
 
-	gh->selection.start = gh->selection.end = 0;
-	gh->selection.bg_color = NULL;
-	gh->selection.min_select = 1;
-	gh->selection.next = gh->selection.prev = NULL;
-	gh->selection.valid = FALSE;
+	priv->selection.start = priv->selection.end = 0;
+	priv->selection.bg_color = NULL;
+	priv->selection.min_select = 1;
+	priv->selection.next = priv->selection.prev = NULL;
+	priv->selection.valid = FALSE;
 
-	gh->auto_highlight = NULL;
+	priv->auto_highlight = NULL;
 
 	/* get ourselves a decent monospaced font for rendering text */
-	gh->disp_font_metrics = gtk_hex_load_font (DEFAULT_FONT);
-	gh->font_desc = pango_font_description_from_string (DEFAULT_FONT);
-	gh->font_provider = gtk_css_provider_new ();
+	priv->disp_font_metrics = gtk_hex_load_font (DEFAULT_FONT);
+	priv->font_desc = pango_font_description_from_string (DEFAULT_FONT);
+	priv->font_provider = gtk_css_provider_new ();
 	gtk_style_context_add_provider (context,
-	                                GTK_STYLE_PROVIDER (gh->font_provider),
+	                                GTK_STYLE_PROVIDER (priv->font_provider),
 	                                GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
 
 
-	gh->char_width = get_max_char_width(gh, gh->disp_font_metrics);
-	gh->char_height = PANGO_PIXELS (pango_font_metrics_get_ascent (gh->disp_font_metrics)) + PANGO_PIXELS (pango_font_metrics_get_descent (gh->disp_font_metrics)) + 2;
+	priv->char_width = get_max_char_width(gh, priv->disp_font_metrics);
+	priv->char_height = PANGO_PIXELS (pango_font_metrics_get_ascent (priv->disp_font_metrics)) + PANGO_PIXELS (pango_font_metrics_get_descent (priv->disp_font_metrics)) + 2;
 
 	
 	gtk_widget_set_can_focus(GTK_WIDGET(gh), TRUE);
@@ -2189,96 +2281,72 @@ static void gtk_hex_init(GtkHex *gh, gpointer klass) {
 	                                GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
 
 
-	gh->adj = GTK_ADJUSTMENT(gtk_adjustment_new(0.0, 0.0, 0.0, 0.0, 0.0, 0.0));
-	gh->xdisp = gtk_drawing_area_new();
+	priv->adj = GTK_ADJUSTMENT(gtk_adjustment_new(0.0, 0.0, 0.0, 0.0, 0.0, 0.0));
+	priv->xdisp = gtk_drawing_area_new();
 
 	/* Create the pango layout for the widget */
-	gh->xlayout = gtk_widget_create_pango_layout (gh->xdisp, "");
+	priv->xlayout = gtk_widget_create_pango_layout (priv->xdisp, "");
 
-	gtk_widget_set_events (gh->xdisp, GDK_EXPOSURE_MASK | GDK_BUTTON_PRESS_MASK |
+	gtk_widget_set_events (priv->xdisp, GDK_EXPOSURE_MASK | GDK_BUTTON_PRESS_MASK |
 						   GDK_BUTTON_RELEASE_MASK | GDK_BUTTON_MOTION_MASK | GDK_SCROLL_MASK);
-	g_signal_connect(G_OBJECT(gh->xdisp), "draw",
+	g_signal_connect(G_OBJECT(priv->xdisp), "draw",
 					 G_CALLBACK(hex_draw), gh);
-	g_signal_connect(G_OBJECT(gh->xdisp), "button_press_event",
+	g_signal_connect(G_OBJECT(priv->xdisp), "button_press_event",
 					 G_CALLBACK(hex_button_cb), gh);
-	g_signal_connect(G_OBJECT(gh->xdisp), "button_release_event",
+	g_signal_connect(G_OBJECT(priv->xdisp), "button_release_event",
 					 G_CALLBACK(hex_button_cb), gh);
-	g_signal_connect(G_OBJECT(gh->xdisp), "motion_notify_event",
+	g_signal_connect(G_OBJECT(priv->xdisp), "motion_notify_event",
 					 G_CALLBACK(hex_motion_cb), gh);
-	g_signal_connect(G_OBJECT(gh->xdisp), "scroll_event",
+	g_signal_connect(G_OBJECT(priv->xdisp), "scroll_event",
 					 G_CALLBACK(hex_scroll_cb), gh);
 
-	context = gtk_widget_get_style_context (GTK_WIDGET (gh->xdisp));
+	context = gtk_widget_get_style_context (GTK_WIDGET (priv->xdisp));
 	gtk_style_context_add_class (context, GTK_STYLE_CLASS_VIEW);
 
-	gtk_fixed_put(GTK_FIXED(gh), gh->xdisp, 0, 0);
-	gtk_widget_show(gh->xdisp);
+	gtk_fixed_put(GTK_FIXED(gh), priv->xdisp, 0, 0);
+	gtk_widget_show(priv->xdisp);
 	
-	gh->adisp = gtk_drawing_area_new();
+	priv->adisp = gtk_drawing_area_new();
 
 	/* Create the pango layout for the widget */
-	gh->alayout = gtk_widget_create_pango_layout (gh->adisp, "");
+	priv->alayout = gtk_widget_create_pango_layout (priv->adisp, "");
 
-	gtk_widget_set_events (gh->adisp, GDK_EXPOSURE_MASK | GDK_BUTTON_PRESS_MASK |
+	gtk_widget_set_events (priv->adisp, GDK_EXPOSURE_MASK | GDK_BUTTON_PRESS_MASK |
 						   GDK_BUTTON_RELEASE_MASK | GDK_BUTTON_MOTION_MASK | GDK_SCROLL_MASK);
-	g_signal_connect(G_OBJECT(gh->adisp), "draw",
+	g_signal_connect(G_OBJECT(priv->adisp), "draw",
 					 G_CALLBACK(ascii_draw), gh);
-	g_signal_connect(G_OBJECT(gh->adisp), "button_press_event",
+	g_signal_connect(G_OBJECT(priv->adisp), "button_press_event",
 					 G_CALLBACK(ascii_button_cb), gh);
-	g_signal_connect(G_OBJECT(gh->adisp), "button_release_event",
+	g_signal_connect(G_OBJECT(priv->adisp), "button_release_event",
 					 G_CALLBACK(ascii_button_cb), gh);
-	g_signal_connect(G_OBJECT(gh->adisp), "motion_notify_event",
+	g_signal_connect(G_OBJECT(priv->adisp), "motion_notify_event",
 					 G_CALLBACK(ascii_motion_cb), gh);
-	g_signal_connect(G_OBJECT(gh->adisp), "scroll_event",
+	g_signal_connect(G_OBJECT(priv->adisp), "scroll_event",
 					 G_CALLBACK(ascii_scroll_cb), gh);
 
-	context = gtk_widget_get_style_context (GTK_WIDGET (gh->adisp));
+	context = gtk_widget_get_style_context (GTK_WIDGET (priv->adisp));
 	gtk_style_context_add_class (context, GTK_STYLE_CLASS_VIEW);
 
-	gtk_fixed_put(GTK_FIXED(gh), gh->adisp, 0, 0);
-	gtk_widget_show(gh->adisp);
+	gtk_fixed_put(GTK_FIXED(gh), priv->adisp, 0, 0);
+	gtk_widget_show(priv->adisp);
 	
-	g_signal_connect(G_OBJECT(gh->adj), "value_changed",
+	g_signal_connect(G_OBJECT(priv->adj), "value_changed",
 					 G_CALLBACK(display_scrolled), gh);
 
-	gh->scrollbar = gtk_scrollbar_new (GTK_ORIENTATION_VERTICAL, gh->adj);
-	gtk_fixed_put(GTK_FIXED(gh), gh->scrollbar, 0, 0);
-	gtk_widget_show(gh->scrollbar);
-}
-
-GType gtk_hex_get_type() {
-	static GType gh_type = 0;
-	
-	if(!gh_type) {
-		GTypeInfo gh_info = {
-			sizeof (GtkHexClass),
-			NULL,		/* base_init */
-			NULL,		/* base_finalize */
-			(GClassInitFunc) gtk_hex_class_init,
-			NULL,		/* class_finalize */
-			NULL,		/* class_data */
-			sizeof (GtkHex),
-			0,
-			(GInstanceInitFunc) gtk_hex_init	
-		};
-	
-		gh_type = g_type_register_static (gtk_fixed_get_type(),
-							"GtkHex",
-							&gh_info,
-							0);	
-	}
-	
-	return gh_type;
+	priv->scrollbar = gtk_scrollbar_new (GTK_ORIENTATION_VERTICAL, priv->adj);
+	gtk_fixed_put(GTK_FIXED(gh), priv->scrollbar, 0, 0);
+	gtk_widget_show(priv->scrollbar);
 }
 
 GtkWidget *gtk_hex_new(HexDocument *owner) {
 	GtkHex *gh;
 
 	gh = GTK_HEX (g_object_new (GTK_TYPE_HEX, NULL));
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
 	g_return_val_if_fail (gh != NULL, NULL);
 
-	gh->document = owner;
-    g_signal_connect (G_OBJECT (gh->document), "document_changed",
+	priv->document = owner;
+    g_signal_connect (G_OBJECT (priv->document), "document_changed",
             G_CALLBACK (gtk_hex_document_changed), gh);
 	
 	return GTK_WIDGET(gh);
@@ -2294,21 +2362,22 @@ GtkWidget *gtk_hex_new(HexDocument *owner) {
 void gtk_hex_set_nibble(GtkHex *gh, gint lower_nibble) {
 	g_return_if_fail(gh != NULL);
 	g_return_if_fail(GTK_IS_HEX(gh));
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
 
-	if(gh->selecting) {
-		bytes_changed(gh, gh->cursor_pos, gh->cursor_pos);
-		gh->lower_nibble = lower_nibble;
+	if(priv->selecting) {
+		bytes_changed(gh, priv->cursor_pos, priv->cursor_pos);
+		priv->lower_nibble = lower_nibble;
 	}
-	else if(gh->selection.end != gh->selection.start) {
-		guint start = MIN(gh->selection.start, gh->selection.end);
-		guint end = MAX(gh->selection.start, gh->selection.end);
-		gh->selection.end = gh->selection.start = 0;
+	else if(priv->selection.end != priv->selection.start) {
+		guint start = MIN(priv->selection.start, priv->selection.end);
+		guint end = MAX(priv->selection.start, priv->selection.end);
+		priv->selection.end = priv->selection.start = 0;
 		bytes_changed(gh, start, end);
-		gh->lower_nibble = lower_nibble;
+		priv->lower_nibble = lower_nibble;
 	}
 	else {
 		hide_cursor(gh);
-		gh->lower_nibble = lower_nibble;
+		priv->lower_nibble = lower_nibble;
 		show_cursor(gh);
 	}
 }
@@ -2317,48 +2386,49 @@ void gtk_hex_set_nibble(GtkHex *gh, gint lower_nibble) {
  * moves cursor to byte index
  */
 void gtk_hex_set_cursor(GtkHex *gh, gint index) {
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
 	guint y;
-	guint old_pos = gh->cursor_pos;
+	guint old_pos = priv->cursor_pos;
 
 	g_return_if_fail(gh != NULL);
 	g_return_if_fail(GTK_IS_HEX(gh));
 
-	if((index >= 0) && (index <= gh->document->file_size)) {
-		if(!gh->insert && index == gh->document->file_size)
+	if((index >= 0) && (index <= priv->document->file_size)) {
+		if(!priv->insert && index == priv->document->file_size)
 			index--;
 
 		index = MAX(index, 0);
 
 		hide_cursor(gh);
 		
-		gh->cursor_pos = index;
+		priv->cursor_pos = index;
 
-		if(gh->cpl == 0)
+		if(priv->cpl == 0)
 			return;
 		
-		y = index / gh->cpl;
-		if(y >= gh->top_line + gh->vis_lines) {
-			gtk_adjustment_set_value(gh->adj, MIN(y - gh->vis_lines + 1, gh->lines - gh->vis_lines));
-			gtk_adjustment_set_value(gh->adj, MAX(gtk_adjustment_get_value(gh->adj), 0));
-			g_signal_emit_by_name(G_OBJECT(gh->adj), "value_changed");
+		y = index / priv->cpl;
+		if(y >= priv->top_line + priv->vis_lines) {
+			gtk_adjustment_set_value(priv->adj, MIN(y - priv->vis_lines + 1, priv->lines - priv->vis_lines));
+			gtk_adjustment_set_value(priv->adj, MAX(gtk_adjustment_get_value(priv->adj), 0));
+			g_signal_emit_by_name(G_OBJECT(priv->adj), "value_changed");
 		}
-		else if (y < gh->top_line) {
-			gtk_adjustment_set_value(gh->adj, y);
-			g_signal_emit_by_name(G_OBJECT(gh->adj), "value_changed");
+		else if (y < priv->top_line) {
+			gtk_adjustment_set_value(priv->adj, y);
+			g_signal_emit_by_name(G_OBJECT(priv->adj), "value_changed");
 		}      
 
-		if(index == gh->document->file_size)
-			gh->lower_nibble = FALSE;
+		if(index == priv->document->file_size)
+			priv->lower_nibble = FALSE;
 		
-		if(gh->selecting) {
-			gtk_hex_set_selection(gh, gh->selection.start, gh->cursor_pos);
-			bytes_changed(gh, MIN(gh->cursor_pos, old_pos), MAX(gh->cursor_pos, old_pos));
+		if(priv->selecting) {
+			gtk_hex_set_selection(gh, priv->selection.start, priv->cursor_pos);
+			bytes_changed(gh, MIN(priv->cursor_pos, old_pos), MAX(priv->cursor_pos, old_pos));
 		}
 		else {
-			guint start = MIN(gh->selection.start, gh->selection.end);
-			guint end = MAX(gh->selection.start, gh->selection.end);
+			guint start = MIN(priv->selection.start, priv->selection.end);
+			guint end = MAX(priv->selection.start, priv->selection.end);
 			bytes_changed(gh, start, end);
-			gh->selection.end = gh->selection.start = gh->cursor_pos;
+			priv->selection.end = priv->selection.start = priv->cursor_pos;
 		}
 
 		g_signal_emit_by_name(G_OBJECT(gh), "cursor_moved");
@@ -2372,45 +2442,46 @@ void gtk_hex_set_cursor(GtkHex *gh, gint index) {
  * moves cursor to column x in line y (in the whole buffer, not just the currently visible part)
  */
 void gtk_hex_set_cursor_xy(GtkHex *gh, gint x, gint y) {
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
 	gint cp;
-	guint old_pos = gh->cursor_pos;
+	guint old_pos = priv->cursor_pos;
 
 	g_return_if_fail(gh != NULL);
 	g_return_if_fail(GTK_IS_HEX(gh));
 
-	cp = y*gh->cpl + x;
+	cp = y*priv->cpl + x;
 
-	if((y >= 0) && (y < gh->lines) && (x >= 0) &&
-	   (x < gh->cpl) && (cp <= gh->document->file_size)) {
-		if(!gh->insert && cp == gh->document->file_size)
+	if((y >= 0) && (y < priv->lines) && (x >= 0) &&
+	   (x < priv->cpl) && (cp <= priv->document->file_size)) {
+		if(!priv->insert && cp == priv->document->file_size)
 			cp--;
 
 		cp = MAX(cp, 0);
 
 		hide_cursor(gh);
-		
-		gh->cursor_pos = cp;
-		
-		if(y >= gh->top_line + gh->vis_lines) {
-			gtk_adjustment_set_value(gh->adj, MIN(y - gh->vis_lines + 1, gh->lines - gh->vis_lines));
-			gtk_adjustment_set_value(gh->adj, MAX(0, gtk_adjustment_get_value(gh->adj)));
-			g_signal_emit_by_name(G_OBJECT(gh->adj), "value_changed");
+
+		priv->cursor_pos = cp;
+
+		if(y >= priv->top_line + priv->vis_lines) {
+			gtk_adjustment_set_value(priv->adj, MIN(y - priv->vis_lines + 1, priv->lines - priv->vis_lines));
+			gtk_adjustment_set_value(priv->adj, MAX(0, gtk_adjustment_get_value(priv->adj)));
+			g_signal_emit_by_name(G_OBJECT(priv->adj), "value_changed");
 		}
-		else if (y < gh->top_line) {
-			gtk_adjustment_set_value(gh->adj, y);
-			g_signal_emit_by_name(G_OBJECT(gh->adj), "value_changed");
+		else if (y < priv->top_line) {
+			gtk_adjustment_set_value(priv->adj, y);
+			g_signal_emit_by_name(G_OBJECT(priv->adj), "value_changed");
 		}      
 		
 		g_signal_emit_by_name(G_OBJECT(gh), "cursor_moved");
-		
-		if(gh->selecting) {
-			gtk_hex_set_selection(gh, gh->selection.start, gh->cursor_pos);
-			bytes_changed(gh, MIN(gh->cursor_pos, old_pos), MAX(gh->cursor_pos, old_pos));
+
+		if(priv->selecting) {
+			gtk_hex_set_selection(gh, priv->selection.start, priv->cursor_pos);
+			bytes_changed(gh, MIN(priv->cursor_pos, old_pos), MAX(priv->cursor_pos, old_pos));
 		}
-		else if(gh->selection.end != gh->selection.start) {
-			guint start = MIN(gh->selection.start, gh->selection.end);
-			guint end = MAX(gh->selection.start, gh->selection.end);
-			gh->selection.end = gh->selection.start = 0;
+		else if(priv->selection.end != priv->selection.start) {
+			guint start = MIN(priv->selection.start, priv->selection.end);
+			guint end = MAX(priv->selection.start, priv->selection.end);
+			priv->selection.end = priv->selection.start = 0;
 			bytes_changed(gh, start, end);
 		}
 		bytes_changed(gh, old_pos, old_pos);
@@ -2425,7 +2496,9 @@ guint gtk_hex_get_cursor(GtkHex *gh) {
 	g_return_val_if_fail(gh != NULL, -1);
 	g_return_val_if_fail(GTK_IS_HEX(gh), -1);
 
-	return gh->cursor_pos;
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
+
+	return priv->cursor_pos;
 }
 
 /*
@@ -2435,8 +2508,10 @@ guchar gtk_hex_get_byte(GtkHex *gh, guint offset) {
 	g_return_val_if_fail(gh != NULL, 0);
 	g_return_val_if_fail(GTK_IS_HEX(gh), 0);
 
-	if((offset >= 0) && (offset < gh->document->file_size))
-		return hex_document_get_byte(gh->document, offset);
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
+
+	if((offset >= 0) && (offset < priv->document->file_size))
+		return hex_document_get_byte(priv->document, offset);
 
 	return 0;
 }
@@ -2450,8 +2525,10 @@ void gtk_hex_set_group_type(GtkHex *gh, guint gt) {
 	g_return_if_fail(gh != NULL);
 	g_return_if_fail(GTK_IS_HEX(gh));
 
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
+
 	hide_cursor(gh);
-	gh->group_type = gt;
+	priv->group_type = gt;
 	gtk_widget_get_allocation(GTK_WIDGET(gh), &allocation);
 	recalc_displays(gh, allocation.width, allocation.height);
 	gtk_widget_queue_resize(GTK_WIDGET(gh));
@@ -2469,26 +2546,28 @@ void gtk_hex_set_font(GtkHex *gh, PangoFontMetrics *font_metrics, const PangoFon
 	g_return_if_fail(gh != NULL);
 	g_return_if_fail(GTK_IS_HEX(gh));
 
-	if (gh->disp_font_metrics)
-		pango_font_metrics_unref (gh->disp_font_metrics);
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
 
-	if (gh->font_desc)
-		pango_font_description_free (gh->font_desc);
-	
-	gh->disp_font_metrics = pango_font_metrics_ref (font_metrics);
-	gh->font_desc = pango_font_description_copy (font_desc);
+	if (priv->disp_font_metrics)
+		pango_font_metrics_unref (priv->disp_font_metrics);
 
-	font = pango_font_description_get_family (gh->font_desc);
-	if (pango_font_description_get_size_is_absolute (gh->font_desc))
-		size = pango_font_description_get_size (gh->font_desc);
+	if (priv->font_desc)
+		pango_font_description_free (priv->font_desc);
+
+	priv->disp_font_metrics = pango_font_metrics_ref (font_metrics);
+	priv->font_desc = pango_font_description_copy (font_desc);
+
+	font = pango_font_description_get_family (priv->font_desc);
+	if (pango_font_description_get_size_is_absolute (priv->font_desc))
+		size = pango_font_description_get_size (priv->font_desc);
 	else
-		size = pango_font_description_get_size (gh->font_desc) / PANGO_SCALE;
+		size = pango_font_description_get_size (priv->font_desc) / PANGO_SCALE;
 
-	gtk_css_provider_load_from_data (GTK_CSS_PROVIDER (gh->font_provider),
+	gtk_css_provider_load_from_data (GTK_CSS_PROVIDER (priv->font_provider),
 	                                 g_strdup_printf (FONT_CSS, font, size), -1, NULL);
 
-	gh->char_width = get_max_char_width(gh, gh->disp_font_metrics);
-	gh->char_height = PANGO_PIXELS (pango_font_metrics_get_ascent (gh->disp_font_metrics)) + PANGO_PIXELS (pango_font_metrics_get_descent (gh->disp_font_metrics)) + 2;
+	priv->char_width = get_max_char_width(gh, priv->disp_font_metrics);
+	priv->char_height = PANGO_PIXELS (pango_font_metrics_get_ascent (priv->disp_font_metrics)) + PANGO_PIXELS (pango_font_metrics_get_descent (priv->disp_font_metrics)) + 2;
 	gtk_widget_get_allocation(GTK_WIDGET(gh), &allocation);
 	recalc_displays(gh, allocation.width, allocation.height);
 	
@@ -2503,10 +2582,12 @@ void gtk_hex_show_offsets(GtkHex *gh, gboolean show)
 	g_return_if_fail(gh != NULL);
 	g_return_if_fail(GTK_IS_HEX(gh));
 
-	if(gh->show_offsets == show)
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
+
+	if(priv->show_offsets == show)
 		return;
 
-	gh->show_offsets = show;
+	priv->show_offsets = show;
 	if(show)
 		show_offsets_widget(gh);
 	else
@@ -2517,7 +2598,8 @@ void gtk_hex_set_starting_offset(GtkHex *gh, gint starting_offset)
 {
 	g_return_if_fail (gh != NULL);
 	g_return_if_fail(GTK_IS_HEX(gh));
-	gh->starting_offset = starting_offset;
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
+	priv->starting_offset = starting_offset;
 }
 
 void gtk_hex_set_insert_mode(GtkHex *gh, gboolean insert)
@@ -2525,11 +2607,12 @@ void gtk_hex_set_insert_mode(GtkHex *gh, gboolean insert)
 	g_return_if_fail(gh != NULL);
 	g_return_if_fail(GTK_IS_HEX(gh));
 
-	gh->insert = insert;
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
+	priv->insert = insert;
 
-	if(!gh->insert && gh->cursor_pos > 0) {
-		if(gh->cursor_pos >= gh->document->file_size)
-			gh->cursor_pos = gh->document->file_size - 1;
+	if(!priv->insert && priv->cursor_pos > 0) {
+		if(priv->cursor_pos >= priv->document->file_size)
+			priv->cursor_pos = priv->document->file_size - 1;
 	}
 }
 
@@ -2563,6 +2646,7 @@ GtkHex_AutoHighlight *gtk_hex_insert_autohighlight(GtkHex *gh,
 												   gint len,
 												   const gchar *colour)
 {
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
 	GtkHex_AutoHighlight *new = g_malloc0(sizeof(GtkHex_AutoHighlight));
 
 	new->search_string = g_memdup(search, len);
@@ -2572,10 +2656,10 @@ GtkHex_AutoHighlight *gtk_hex_insert_autohighlight(GtkHex *gh,
 
 	new->highlights = NULL;
 
-	new->next = gh->auto_highlight;
+	new->next = priv->auto_highlight;
 	new->prev = NULL;
 	if (new->next) new->next->prev = new;
-	gh->auto_highlight = new;
+	priv->auto_highlight = new;
 
 	new->view_min = 0;
 	new->view_max = 0;
@@ -2587,6 +2671,8 @@ GtkHex_AutoHighlight *gtk_hex_insert_autohighlight(GtkHex *gh,
 
 void gtk_hex_delete_autohighlight(GtkHex *gh, GtkHex_AutoHighlight *ahl)
 {
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
+
 	g_free(ahl->search_string);
 	g_free(ahl->colour);
 
@@ -2598,15 +2684,65 @@ void gtk_hex_delete_autohighlight(GtkHex *gh, GtkHex_AutoHighlight *ahl)
 	if (ahl->next) ahl->next->prev = ahl->prev;
 	if (ahl->prev) ahl->prev->next = ahl->next;
 
-	if (gh->auto_highlight == ahl) gh->auto_highlight = ahl->next;
+	if (priv->auto_highlight == ahl) priv->auto_highlight = ahl->next;
 
 	g_free(ahl);
 }
 
 void gtk_hex_set_geometry(GtkHex *gh, gint cpl, gint vis_lines)
 {
-    gh->priv->default_cpl = cpl;
-    gh->priv->default_lines = vis_lines;
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (gh);
+    priv->default_cpl = cpl;
+    priv->default_lines = vis_lines;
+}
+
+HexDocument *
+gtk_hex_get_document (GtkHex *self)
+{
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (self);
+	return priv->document;
+}
+
+guint
+gtk_hex_get_cursor_pos (GtkHex *self)
+{
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (self);
+	return priv->cursor_pos;
+}
+
+guint
+gtk_hex_get_group_type (GtkHex *self)
+{
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (self);
+	return priv->group_type;
+}
+
+gboolean
+gtk_hex_get_insert (GtkHex *self)
+{
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (self);
+	return priv->insert;
+}
+
+gint
+gtk_hex_get_cpl (GtkHex *self)
+{
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (self);
+	return priv->cpl;
+}
+
+gint
+gtk_hex_get_visible_lines (GtkHex *self)
+{
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (self);
+	return priv->vis_lines;
+}
+
+gint
+gtk_hex_get_active_view (GtkHex *self)
+{
+	GtkHexPrivate *priv = gtk_hex_get_instance_private (self);
+	return priv->active_view;
 }
 
 void add_atk_namedesc (GtkWidget *widget, const gchar *name, const gchar *desc)

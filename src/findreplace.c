@@ -538,7 +538,7 @@ g_hex_find_advanced_prev (GHexFindAdvanced *self,
 	cond = g_hex_find_row_get_condition (row);
 	str = g_hex_find_condition_get_condition (cond);
 
-	if (hex_document_find_backward (gh->document, gh->cursor_pos,
+	if (hex_document_find_backward (gtk_hex_get_document (gh), gtk_hex_get_cursor_pos (gh),
 									(guchar *) str->str, str->len, &offset)) {
 		gtk_hex_set_cursor (gh, offset);
 	} else {
@@ -560,7 +560,7 @@ g_hex_find_advanced_next (GHexFindAdvanced *self,
 	cond = g_hex_find_row_get_condition (row);
 	str = g_hex_find_condition_get_condition (cond);
 
-	if (hex_document_find_forward (gh->document, gh->cursor_pos+1,
+	if (hex_document_find_forward (gtk_hex_get_document (gh), gtk_hex_get_cursor_pos (gh) + 1,
 								   (guchar *) str->str, str->len, &offset)) {
 		gtk_hex_set_cursor (gh, offset);
 	} else {

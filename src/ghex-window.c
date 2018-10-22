@@ -127,7 +127,7 @@ ghex_window_close(GHexWindow *win)
 		return FALSE;
 	}
 
-	doc = win->gh->document;
+	doc = gtk_hex_get_document (win->gh);
 	
 	if (doc->views->next == NULL) {
 		if (!ghex_window_ok_to_close (win))
@@ -182,8 +182,8 @@ ghex_window_set_sensitivity (GHexWindow *win)
     GAction *act;
     gboolean allmenus = (win->gh != NULL);
 
-    win->undo_sens = (allmenus && (win->gh->document->undo_top != NULL));
-    win->redo_sens = (allmenus && (win->gh->document->undo_stack != NULL && win->gh->document->undo_top != win->gh->document->undo_stack));
+    win->undo_sens = (allmenus && (gtk_hex_get_document (win->gh)->undo_top != NULL));
+    win->redo_sens = (allmenus && (gtk_hex_get_document (win->gh)->undo_stack != NULL && gtk_hex_get_document (win->gh)->undo_top != gtk_hex_get_document (win->gh)->undo_stack));
 
 	act = g_action_map_lookup_action (G_ACTION_MAP (win), "open-view");
     g_simple_action_set_enabled (G_SIMPLE_ACTION (act), allmenus);
@@ -199,7 +199,7 @@ ghex_window_set_sensitivity (GHexWindow *win)
     act = g_action_map_lookup_action (G_ACTION_MAP (win), "export");
     g_simple_action_set_enabled (G_SIMPLE_ACTION (act), allmenus);
     act = g_action_map_lookup_action (G_ACTION_MAP (win), "revert");
-    g_simple_action_set_enabled (G_SIMPLE_ACTION (act), allmenus && win->gh->document->changed);
+    g_simple_action_set_enabled (G_SIMPLE_ACTION (act), allmenus && gtk_hex_get_document (win->gh)->changed);
     act = g_action_map_lookup_action (G_ACTION_MAP (win), "print");
     g_simple_action_set_enabled (G_SIMPLE_ACTION (act), allmenus);
     act = g_action_map_lookup_action (G_ACTION_MAP (win), "print-preview");
@@ -238,7 +238,7 @@ ghex_window_doc_changed(HexDocument *doc, HexChangeData *change_data,
     GHexWindow *win = GHEX_WINDOW(user_data);
     GAction    *act;
 
-    if(!win->gh->document->changed)
+    if(!gtk_hex_get_document (win->gh)->changed)
         return;
 
     if(!win->changed) {
@@ -246,14 +246,14 @@ ghex_window_doc_changed(HexDocument *doc, HexChangeData *change_data,
         win->changed = TRUE;
     }
     else if(push_undo) {
-        if(win->undo_sens != ( win->gh->document->undo_top == NULL)) {
-            win->undo_sens = (win->gh->document->undo_top != NULL);
+        if(win->undo_sens != ( gtk_hex_get_document (win->gh)->undo_top == NULL)) {
+            win->undo_sens = (gtk_hex_get_document (win->gh)->undo_top != NULL);
             act = g_action_map_lookup_action (G_ACTION_MAP (win), "undo");
             g_simple_action_set_enabled (G_SIMPLE_ACTION (act), win->undo_sens);
         }
-        if(win->redo_sens != (win->gh->document->undo_stack != NULL && (win->gh->document->undo_stack != win->gh->document->undo_top))) {
-            win->redo_sens = (win->gh->document->undo_stack != NULL &&
-                              (win->gh->document->undo_top != win->gh->document->undo_stack));
+        if(win->redo_sens != (gtk_hex_get_document (win->gh)->undo_stack != NULL && (gtk_hex_get_document (win->gh)->undo_stack != gtk_hex_get_document (win->gh)->undo_top))) {
+            win->redo_sens = (gtk_hex_get_document (win->gh)->undo_stack != NULL &&
+                              (gtk_hex_get_document (win->gh)->undo_top != gtk_hex_get_document (win->gh)->undo_stack));
             act = g_action_map_lookup_action (G_ACTION_MAP (win), "redo");
             g_simple_action_set_enabled (G_SIMPLE_ACTION (act), win->redo_sens);
         }
@@ -271,8 +271,8 @@ ghex_window_destroy (GtkWidget *object)
 	win = GHEX_WINDOW (object);
 
 	if (win->gh) {
-		hex_document_remove_view (win->gh->document, GTK_WIDGET (win->gh));
-		g_signal_handlers_disconnect_matched (win->gh->document,
+		hex_document_remove_view (gtk_hex_get_document (win->gh), GTK_WIDGET (win->gh));
+		g_signal_handlers_disconnect_matched (gtk_hex_get_document (win->gh),
 											  G_SIGNAL_MATCH_FUNC | G_SIGNAL_MATCH_DATA,
 											  0, 0, NULL,
 											  ghex_window_doc_changed,
@@ -627,7 +627,7 @@ ghex_window_new_from_doc (GHexApplication *application,
     g_signal_connect(G_OBJECT(doc), "document_changed",
                      G_CALLBACK(ghex_window_doc_changed), win);
     ghex_window_set_doc_name(GHEX_WINDOW(win),
-                             GHEX_WINDOW(win)->gh->document->path_end);
+                             gtk_hex_get_document (GHEX_WINDOW(win)->gh)->path_end);
     ghex_window_set_sensitivity(GHEX_WINDOW(win));
 
     return win;
@@ -769,8 +769,8 @@ ghex_window_load(GHexWindow *win, const gchar *filename)
     }
 
     if(win->gh) {
-        hex_document_remove_view(win->gh->document, GTK_WIDGET(win->gh));
-        g_signal_handlers_disconnect_matched(win->gh->document,
+        hex_document_remove_view(gtk_hex_get_document (win->gh), GTK_WIDGET(win->gh));
+        g_signal_handlers_disconnect_matched(gtk_hex_get_document (win->gh),
                                              G_SIGNAL_MATCH_FUNC | G_SIGNAL_MATCH_DATA,
                                              0, 0, NULL,
                                              ghex_window_doc_changed,
@@ -780,7 +780,7 @@ ghex_window_load(GHexWindow *win, const gchar *filename)
     win->gh = GTK_HEX(gh);
     win->changed = FALSE;
 
-    ghex_window_set_doc_name(win, win->gh->document->path_end);
+    ghex_window_set_doc_name(win, gtk_hex_get_document (win->gh)->path_end);
     ghex_window_set_sensitivity(win);
 
     g_signal_emit_by_name(G_OBJECT(gh), "cursor_moved");
@@ -897,7 +897,7 @@ ghex_window_find_for_doc(HexDocument *doc)
 	while (win_node) {
 		if (GHEX_IS_WINDOW (win_node->data)) {
 			win = GHEX_WINDOW(win_node->data);
-			if (win->gh && win->gh->document == doc)
+			if (win->gh && gtk_hex_get_document (win->gh) == doc)
 				return win;
 			win_node = g_list_next (win_node);
 		}
@@ -916,7 +916,7 @@ ghex_window_save_as(GHexWindow *win)
 	if(win->gh == NULL)
 		return ret_val;
 
-	doc = win->gh->document;
+	doc = gtk_hex_get_document (win->gh);
 	file_sel =
         gtk_file_chooser_dialog_new(_("Select a file to save buffer as"),
                                     GTK_WINDOW(win),
@@ -1024,7 +1024,7 @@ ghex_window_ok_to_close(GHexWindow *win)
 	if (win->gh == NULL)
 		return TRUE;
 
-	doc = win->gh->document;
+	doc = gtk_hex_get_document (win->gh);
 	file_exists = ghex_window_path_exists (doc->file_name);
 	if (!hex_document_has_changed (doc) && file_exists)
 		return TRUE;

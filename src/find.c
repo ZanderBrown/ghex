@@ -81,16 +81,16 @@ g_hex_find_response (GHexFind *self, gint res, gpointer data)
 	self->auto_highlight = gtk_hex_insert_autohighlight (gh, str, str_len, "red");
 
 	if (res == FIND_PREV) {
-		if (hex_document_find_backward (gh->document,
-										gh->cursor_pos, (guchar *) str, str_len, &offset)) {
+		if (hex_document_find_backward (gtk_hex_get_document (gh),
+										gtk_hex_get_cursor_pos (gh), (guchar *) str, str_len, &offset)) {
 			gtk_hex_set_cursor (gh, offset);
 		} else {
 			ghex_window_flash (win, _("Beginning Of File reached"));
 			display_info_dialog (GTK_WINDOW (win), _("String was not found!\n"));
 		}
 	} else {
-		if(hex_document_find_forward(gh->document,
-									 gh->cursor_pos+1, (guchar *) str, str_len, &offset)) {
+		if(hex_document_find_forward(gtk_hex_get_document (gh),
+									 gtk_hex_get_cursor_pos (gh)+1, (guchar *) str, str_len, &offset)) {
 			gtk_hex_set_cursor(gh, offset);
 		} else {
 			ghex_window_flash(win, _("End Of File reached"));
